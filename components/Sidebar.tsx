@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays } from 'lucide-react';
+import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMemo } from 'react';
 
@@ -11,6 +11,7 @@ export default function Sidebar() {
   const { user, profile } = useAuth();
 
   const isAdmin = profile?.role === 'admin';
+  const isLeader = profile?.role === 'leader';
 
   const menuItems = useMemo(() => {
     const items = [
@@ -19,6 +20,10 @@ export default function Sidebar() {
       { name: '캘린더', href: '/calendar', icon: Calendar },
     ];
 
+    if (isAdmin || isLeader) {
+      items.push({ name: 'KPI', href: '/kpi', icon: BarChart3 });
+    }
+
     if (isAdmin) {
       items.push({ name: '인원 관리', href: '/employees', icon: Users });
     } else {
@@ -26,7 +31,7 @@ export default function Sidebar() {
     }
 
     return items;
-  }, [isAdmin]);
+  }, [isAdmin, isLeader]);
 
   const displayName =
     profile?.display_name ||
