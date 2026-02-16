@@ -3,7 +3,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
 
 export default function LoginPage() {
   return (
@@ -19,6 +19,7 @@ function LoginForm() {
   const next = searchParams.get('next') || '/';
 
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -51,6 +52,7 @@ function LoginForm() {
         email,
         password,
         options: {
+          data: { full_name: name },
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${next}`,
         },
       });
@@ -128,6 +130,26 @@ function LoginForm() {
 
         {/* Email/Password Form */}
         <form onSubmit={handleEmailAuth} className="space-y-4">
+          {mode === 'signup' && (
+            <div>
+              <label htmlFor="name" className="mb-1 block text-sm font-medium text-gray-700">
+                이름
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="홍길동"
+                  required
+                  className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
               이메일
@@ -195,7 +217,7 @@ function LoginForm() {
             <>
               계정이 없으신가요?{' '}
               <button
-                onClick={() => { setMode('signup'); setError(''); setMessage(''); }}
+                onClick={() => { setMode('signup'); setError(''); setMessage(''); setName(''); }}
                 className="font-medium text-blue-600 hover:text-blue-700"
               >
                 회원가입
