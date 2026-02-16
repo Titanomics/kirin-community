@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3 } from 'lucide-react';
+import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMemo } from 'react';
 
@@ -26,6 +26,7 @@ export default function Sidebar() {
 
     if (isAdmin) {
       items.push({ name: '인원 관리', href: '/employees', icon: Users });
+      items.push({ name: '관리자 대시보드', href: '/admin', icon: Shield });
     } else {
       items.push({ name: '내 연차 보기', href: '/my-leave', icon: CalendarDays });
     }
