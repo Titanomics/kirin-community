@@ -33,24 +33,49 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const pathname = request.nextUrl.pathname
+  const isLoginPage = pathname === '/login'
+  const isAdminLoginPage = pathname === '/admin/login'
+  const isAuthRoute = pathname.startsWith('/auth')
+  const isAdminRoute = pathname.startsWith('/admin') && !isAdminLoginPage
+
+  // Allow access to login pages and auth routes without authentication
+  if (isLoginPage || isAdminLoginPage || isAuthRoute) {
+    // Redirect authenticated users away from general login page
+    if (user && isLoginPage) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
+
   // Redirect unauthenticated users to login
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
+  if (!user) {
     const url = request.nextUrl.clone()
-    const next = request.nextUrl.pathname + request.nextUrl.search
-    url.pathname = '/login'
+    const next = pathname + request.nextUrl.search
+    if (isAdminRoute) {
+      url.pathname = '/admin/login'
+    } else {
+      url.pathname = '/login'
+    }
     url.searchParams.set('next', next)
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from login
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
+  // Admin route protection: check role from profiles table
+  if (isAdminRoute) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

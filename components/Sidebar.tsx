@@ -2,26 +2,38 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, MessageSquare, Calendar, Users, LayoutDashboard } from 'lucide-react';
+import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-const menuItems = [
-  { name: '대시보드', href: '/', icon: LayoutDashboard },
-  { name: '게시판', href: '/board', icon: MessageSquare },
-  { name: '캘린더', href: '/calendar', icon: Calendar },
-  { name: '인원 관리', href: '/employees', icon: Users },
-];
+import { useMemo } from 'react';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, profile } = useAuth();
+
+  const isAdmin = profile?.role === 'admin';
+
+  const menuItems = useMemo(() => {
+    const items = [
+      { name: '대시보드', href: '/', icon: LayoutDashboard },
+      { name: '게시판', href: '/board', icon: MessageSquare },
+      { name: '캘린더', href: '/calendar', icon: Calendar },
+    ];
+
+    if (isAdmin) {
+      items.push({ name: '인원 관리', href: '/employees', icon: Users });
+    } else {
+      items.push({ name: '내 연차 보기', href: '/my-leave', icon: CalendarDays });
+    }
+
+    return items;
+  }, [isAdmin]);
 
   const displayName =
     profile?.display_name ||
     user?.user_metadata?.full_name ||
     user?.email?.split('@')[0] ||
     '사용자';
-  const roleLabel = profile?.role === 'admin' ? '관리자' : '사용자';
+  const roleLabel = isAdmin ? '관리자' : profile?.role === 'leader' ? '팀장' : '사용자';
   const initial = displayName.charAt(0);
 
   return (
