@@ -48,6 +48,7 @@ export default function KpiPage() {
 
   const isAdmin = myProfile?.role === 'admin';
   const isLeader = myProfile?.role === 'leader';
+  const isUser = !isAdmin && !isLeader;
   const canEdit = isAdmin || isLeader;
 
   useEffect(() => {
@@ -152,10 +153,14 @@ export default function KpiPage() {
 
   // 필터링
   const filteredMetrics = metrics.filter((m) => {
+    // 일반 유저: 본인 KPI만
+    if (isUser) {
+      return myProfile ? m.user_id === myProfile.id : false;
+    }
     if (filterTeam !== 'all' && m.team !== filterTeam) return false;
     if (filterPeriod && m.period !== filterPeriod) return false;
     // 팀장은 자기 팀만 볼 수 있음
-    if (isLeader && !isAdmin && myProfile) {
+    if (isLeader && myProfile) {
       const myTeam = profiles.find((p) => p.id === myProfile.id)?.team;
       if (m.team !== myTeam) return false;
     }
@@ -201,12 +206,93 @@ export default function KpiPage() {
   const editableProfiles = getEditableProfiles();
   const periods = [...new Set(metrics.map((m) => m.period))].sort().reverse();
 
+  // 일반 유저: 별도 뷰
+  if (isUser) {
+    const myMetrics = filteredMetrics;
+    const avgRate = myMetrics.length > 0
+      ? myMetrics.reduce((sum, m) => sum + Number(m.achievement_rate || 0), 0) / myMetrics.length
+      : 0;
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">내 KPI</h1>
+          <p className="mt-2 text-gray-600">나에게 할당된 KPI 목표와 달성률을 확인하세요</p>
+        </div>
+
+        {/* 기간 필터 */}
+        <div className="flex flex-wrap gap-4 rounded-lg bg-white p-4 shadow">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">기간</label>
+            <select
+              value={filterPeriod}
+              onChange={(e) => setFilterPeriod(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">전체</option>
+              {periods.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {myMetrics.length === 0 ? (
+          <div className="rounded-lg bg-white p-12 text-center shadow">
+            <BarChart3 className="mx-auto h-12 w-12 text-gray-300" />
+            <p className="mt-4 text-gray-500">아직 등록된 KPI가 없습니다</p>
+            <p className="mt-1 text-sm text-gray-400">팀장에게 KPI 등록을 요청하세요</p>
+          </div>
+        ) : (
+          <div className="rounded-lg bg-white shadow">
+            {/* 평균 달성률 헤더 */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <p className="text-sm font-medium text-gray-500">전체 평균 달성률</p>
+              <p className={`text-2xl font-bold ${avgRate >= 100 ? 'text-green-600' : avgRate >= 70 ? 'text-blue-600' : avgRate >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {avgRate.toFixed(1)}%
+              </p>
+            </div>
+            <div className="divide-y divide-gray-50 p-6">
+              {myMetrics.map((metric) => {
+                const rate = Number(metric.achievement_rate || 0);
+                return (
+                  <div key={metric.id} className="py-4 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">{metric.metric_name}</span>
+                        <span className="ml-2 text-xs text-gray-400">{metric.period}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600">
+                          {metric.current_value} / {metric.target_value}
+                        </span>
+                        <span className={`text-sm font-bold ${rate >= 100 ? 'text-green-600' : rate >= 70 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {rate.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className={`h-3 w-full rounded-full ${getProgressBgColor(rate)}`}>
+                      <div
+                        className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(rate)}`}
+                        style={{ width: `${Math.min(rate, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">KPI 대시보드</h1>
-          <p className="mt-2 text-gray-600">팀원별 KPI 성과를 확인하세요</p>
+          <p className="mt-2 text-gray-600">{isLeader ? '우리 팀' : '팀원별'} KPI 성과를 확인하세요</p>
         </div>
         {canEdit && (
           <button

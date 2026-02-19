@@ -20,9 +20,7 @@ export default function Sidebar() {
       { name: '캘린더', href: '/calendar', icon: Calendar },
     ];
 
-    if (isAdmin || isLeader) {
-      items.push({ name: 'KPI', href: '/kpi', icon: BarChart3 });
-    }
+    items.push({ name: 'KPI', href: '/kpi', icon: BarChart3 });
 
     if (isAdmin) {
       items.push({ name: '인원 관리', href: '/employees', icon: Users });
