@@ -73,12 +73,12 @@ export default function AdminDashboardPage() {
       supabase.from('profiles').select('*'),
       supabase
         .from('leave_requests')
-        .select('*, profiles(display_name, email)')
+        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd + 'T23:59:59'),
       supabase
         .from('leave_requests')
-        .select('*, profiles(display_name, email)')
+        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
         .eq('status', '대기')
         .order('created_at', { ascending: false }),
       supabase

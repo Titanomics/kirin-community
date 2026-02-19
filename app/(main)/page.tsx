@@ -47,12 +47,12 @@ export default function Home() {
       supabase.from('profiles').select('*'),
       supabase
         .from('leave_requests')
-        .select('*, profiles(display_name, email)')
+        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
         .eq('status', '대기')
         .order('created_at', { ascending: false }),
       supabase
         .from('leave_requests')
-        .select('*, profiles(display_name, email)')
+        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
         .eq('status', '승인')
         .order('start_date', { ascending: false })
         .limit(5),

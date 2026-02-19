@@ -46,7 +46,7 @@ export default function CalendarPage() {
 
     const { data } = await supabase
       .from('leave_requests')
-      .select('*, profiles(display_name, email)')
+      .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
       .eq('status', '승인')
       .lte('start_date', end)
       .gte('end_date', start);
