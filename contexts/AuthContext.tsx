@@ -29,23 +29,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
-      if (user) {
-        fetchProfile(user.id);
-      } else {
-        setLoading(false);
-      }
+      if (!user) setLoading(false);
     }).catch(() => {
       setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      // CRITICAL: Do NOT call Supabase API methods (async) inside this callback.
+      // Doing so causes a navigator.locks deadlock that hangs all subsequent API calls.
+      // See: https://github.com/supabase/auth-js/issues/762
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (currentUser) {
-        await fetchProfile(currentUser.id);
-      } else {
+      if (!currentUser) {
         setProfile(null);
         setLoading(false);
       }
@@ -53,6 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Fetch profile in a separate effect to avoid navigator.locks deadlock
+  useEffect(() => {
+    if (user) {
+      fetchProfile(user.id);
+    }
+  }, [user?.id]);
 
   async function fetchProfile(userId: string) {
     try {
