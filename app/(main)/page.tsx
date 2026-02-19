@@ -43,24 +43,29 @@ export default function Home() {
   }, [myProfile]);
 
   async function fetchData() {
-    const [profilesRes, pendingRes, approvedRes] = await Promise.all([
-      supabase.from('profiles').select('*'),
-      supabase
-        .from('leave_requests')
-        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
-        .eq('status', '대기')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('leave_requests')
-        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
-        .eq('status', '승인')
-        .order('start_date', { ascending: false })
-        .limit(5),
-    ]);
-    setProfiles(profilesRes.data || []);
-    setPendingLeaves(pendingRes.data || []);
-    setApprovedLeaves(approvedRes.data || []);
-    setLoading(false);
+    try {
+      const [profilesRes, pendingRes, approvedRes] = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase
+          .from('leave_requests')
+          .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
+          .eq('status', '대기')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('leave_requests')
+          .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
+          .eq('status', '승인')
+          .order('start_date', { ascending: false })
+          .limit(5),
+      ]);
+      setProfiles(profilesRes.data || []);
+      setPendingLeaves(pendingRes.data || []);
+      setApprovedLeaves(approvedRes.data || []);
+    } catch (err) {
+      console.error('데이터 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleLeaveAction(id: string, status: '승인' | '반려') {

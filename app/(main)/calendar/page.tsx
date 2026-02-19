@@ -44,15 +44,20 @@ export default function CalendarPage() {
     const start = format(monthStart, 'yyyy-MM-dd');
     const end = format(monthEnd, 'yyyy-MM-dd');
 
-    const { data } = await supabase
-      .from('leave_requests')
-      .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
-      .eq('status', '승인')
-      .lte('start_date', end)
-      .gte('end_date', start);
+    try {
+      const { data } = await supabase
+        .from('leave_requests')
+        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
+        .eq('status', '승인')
+        .lte('start_date', end)
+        .gte('end_date', start);
 
-    setLeaves(data || []);
-    setLoading(false);
+      setLeaves(data || []);
+    } catch (err) {
+      console.error('캘린더 데이터 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // 특정 날짜에 해당하는 승인된 휴가 이벤트 계산

@@ -40,13 +40,18 @@ export default function MyLeavePage() {
   }, [user]);
 
   async function fetchLeaves() {
-    const { data } = await supabase
-      .from('leave_requests')
-      .select('*')
-      .eq('user_id', user!.id)
-      .order('created_at', { ascending: false });
-    setLeaves(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('leave_requests')
+        .select('*')
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false });
+      setLeaves(data || []);
+    } catch (err) {
+      console.error('연차 데이터 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

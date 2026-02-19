@@ -34,12 +34,17 @@ export default function EmployeesPage() {
   }, []);
 
   async function fetchProfiles() {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: true });
-    setProfiles(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: true });
+      setProfiles(data || []);
+    } catch (err) {
+      console.error('인원 데이터 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const filteredProfiles = profiles.filter(

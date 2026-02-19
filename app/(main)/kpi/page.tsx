@@ -55,17 +55,22 @@ export default function KpiPage() {
   }, []);
 
   async function fetchData() {
-    const [metricsRes, profilesRes] = await Promise.all([
-      supabase
-        .from('kpi_metrics')
-        .select('*, profiles(display_name, email)')
-        .order('period', { ascending: false }),
-      supabase.from('profiles').select('*'),
-    ]);
+    try {
+      const [metricsRes, profilesRes] = await Promise.all([
+        supabase
+          .from('kpi_metrics')
+          .select('*, profiles(display_name, email)')
+          .order('period', { ascending: false }),
+        supabase.from('profiles').select('*'),
+      ]);
 
-    setMetrics(metricsRes.data || []);
-    setProfiles(profilesRes.data || []);
-    setLoading(false);
+      setMetrics(metricsRes.data || []);
+      setProfiles(profilesRes.data || []);
+    } catch (err) {
+      console.error('KPI 데이터 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // 팀장은 자기 팀원만 편집 가능

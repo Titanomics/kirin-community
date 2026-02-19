@@ -39,39 +39,44 @@ export default function BoardPage() {
   }, []);
 
   async function fetchData() {
-    const [postsRes, profilesRes] = await Promise.all([
-      supabase
-        .from('posts')
-        .select('*, profiles(display_name, email)')
-        .order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }),
-    ]);
+    try {
+      const [postsRes, profilesRes] = await Promise.all([
+        supabase
+          .from('posts')
+          .select('*, profiles(display_name, email)')
+          .order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+      ]);
 
-    // 댓글 수 가져오기
-    const postsData = postsRes.data || [];
-    const postIds = postsData.map((p) => p.id);
+      // 댓글 수 가져오기
+      const postsData = postsRes.data || [];
+      const postIds = postsData.map((p) => p.id);
 
-    let commentCounts: Record<string, number> = {};
-    if (postIds.length > 0) {
-      const { data: comments } = await supabase
-        .from('post_comments')
-        .select('post_id');
+      let commentCounts: Record<string, number> = {};
+      if (postIds.length > 0) {
+        const { data: comments } = await supabase
+          .from('post_comments')
+          .select('post_id');
 
-      if (comments) {
-        for (const c of comments) {
-          commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1;
+        if (comments) {
+          for (const c of comments) {
+            commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1;
+          }
         }
       }
-    }
 
-    setPosts(
-      postsData.map((p) => ({
-        ...p,
-        comment_count: commentCounts[p.id] || 0,
-      }))
-    );
-    setTotalUsers(profilesRes.count || 0);
-    setLoading(false);
+      setPosts(
+        postsData.map((p) => ({
+          ...p,
+          comment_count: commentCounts[p.id] || 0,
+        }))
+      );
+      setTotalUsers(profilesRes.count || 0);
+    } catch (err) {
+      console.error('게시판 데이터 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const bestThreshold = Math.max(1, Math.floor(totalUsers * BEST_RATIO));

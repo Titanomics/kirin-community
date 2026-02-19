@@ -53,17 +53,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    setProfile(data);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      setProfile(data);
+    } catch (err) {
+      console.error('프로필 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // signOut API 실패해도 로컬 세션은 정리
+    }
     setUser(null);
     setProfile(null);
     window.location.href = '/login';

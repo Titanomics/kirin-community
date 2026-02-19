@@ -45,13 +45,18 @@ export default function PostDetailPageClient({ postId }: { postId: string }) {
   }, [postId]);
 
   async function fetchPost() {
-    const { data } = await supabase
-      .from('posts')
-      .select('*, profiles(display_name, email)')
-      .eq('id', postId)
-      .single();
-    setPost(data);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('posts')
+        .select('*, profiles(display_name, email)')
+        .eq('id', postId)
+        .single();
+      setPost(data);
+    } catch (err) {
+      console.error('게시글 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function fetchComments() {

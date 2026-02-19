@@ -69,29 +69,34 @@ export default function AdminDashboardPage() {
   }, []);
 
   async function fetchAll() {
-    const [profilesRes, monthLeavesRes, pendingRes, kpiRes] = await Promise.all([
-      supabase.from('profiles').select('*'),
-      supabase
-        .from('leave_requests')
-        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
-        .gte('created_at', monthStart)
-        .lte('created_at', monthEnd + 'T23:59:59'),
-      supabase
-        .from('leave_requests')
-        .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
-        .eq('status', '대기')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('kpi_metrics')
-        .select('*')
-        .eq('period', currentMonth),
-    ]);
+    try {
+      const [profilesRes, monthLeavesRes, pendingRes, kpiRes] = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase
+          .from('leave_requests')
+          .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
+          .gte('created_at', monthStart)
+          .lte('created_at', monthEnd + 'T23:59:59'),
+        supabase
+          .from('leave_requests')
+          .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')
+          .eq('status', '대기')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('kpi_metrics')
+          .select('*')
+          .eq('period', currentMonth),
+      ]);
 
-    setProfiles(profilesRes.data || []);
-    setMonthLeaves(monthLeavesRes.data || []);
-    setPendingLeaves(pendingRes.data || []);
-    setKpiMetrics(kpiRes.data || []);
-    setLoading(false);
+      setProfiles(profilesRes.data || []);
+      setMonthLeaves(monthLeavesRes.data || []);
+      setPendingLeaves(pendingRes.data || []);
+      setKpiMetrics(kpiRes.data || []);
+    } catch (err) {
+      console.error('관리자 데이터 로딩 실패:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // 오늘 생일인 사원
