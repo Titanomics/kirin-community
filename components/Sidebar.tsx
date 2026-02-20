@@ -2,15 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Moon, Sun } from 'lucide-react';
+import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDarkMode } from '@/contexts/DarkModeContext';
 import { useMemo } from 'react';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, profile } = useAuth();
-  const { isDark, toggle } = useDarkMode();
 
   const isAdmin = profile?.role === 'admin';
   const isLeader = profile?.role === 'leader';
@@ -73,24 +71,12 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* User Info + Dark Mode Toggle */}
+        {/* User Info */}
         <div className="border-t border-gray-800 p-4">
-          <div className="flex items-center gap-2">
-            {/* 다크모드 토글 — 닉네임 왼쪽 */}
-            <button
-              onClick={toggle}
-              title={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-800 hover:text-yellow-300"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            {/* 아바타 */}
-            <div className="h-9 w-9 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
               <span className="text-sm font-semibold">{initial}</span>
             </div>
-
-            {/* 닉네임 + 역할 */}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{displayName}</p>
               <p className="text-xs text-gray-400">{roleLabel}</p>

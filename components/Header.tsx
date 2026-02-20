@@ -1,10 +1,12 @@
 'use client';
 
-import { Bell, Search, LogOut } from 'lucide-react';
+import { Bell, Search, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDarkMode } from '@/contexts/DarkModeContext';
 
 export default function Header() {
   const { user, profile, signOut } = useAuth();
+  const { isDark, toggle } = useDarkMode();
 
   const displayName =
     profile?.display_name ||
@@ -29,11 +31,21 @@ export default function Header() {
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* 다크모드 토글 */}
+          <button
+            onClick={toggle}
+            title={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+
+          {/* 알림 (실제 알림 없으면 빨간 점 미표시) */}
           <button className="relative rounded-full p-2 hover:bg-gray-100">
             <Bell className="h-5 w-5 text-gray-600" />
-            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500"></span>
           </button>
+
           <div className="text-sm">
             <p className="font-medium text-gray-900">{displayName}</p>
             <p className="text-gray-500">{displayEmail}</p>
