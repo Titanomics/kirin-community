@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { Edit, Search, Download, Save, X } from 'lucide-react';
+import { Edit, Search, Download, Save, X, UserX } from 'lucide-react';
 import { format, differenceInMonths } from 'date-fns';
 
 interface Profile {
@@ -16,6 +16,7 @@ interface Profile {
   birthday: string | null;
   created_at: string;
   leave_adjustment: number;
+  resigned_at: string | null;
 }
 
 interface LeaveRequest {
@@ -58,6 +59,7 @@ export default function EmployeesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ joined_at: '', birthday: '', team: '', role: '', leave_adjustment: '0' });
   const [saving, setSaving] = useState(false);
+  const [showResigned, setShowResigned] = useState(false);
 
   const isAdmin = myProfile?.role === 'admin';
 
@@ -86,7 +88,11 @@ export default function EmployeesPage() {
     }
   }
 
-  const filteredProfiles = profiles.filter(
+  const activeProfiles = profiles.filter((p) => !p.resigned_at);
+  const resignedProfiles = profiles.filter((p) => !!p.resigned_at);
+  const displayProfiles = showResigned ? profiles : activeProfiles;
+
+  const filteredProfiles = displayProfiles.filter(
     (p) =>
       (p.display_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -126,6 +132,28 @@ export default function EmployeesPage() {
       role: p.role,
       leave_adjustment: String(p.leave_adjustment ?? 0),
     });
+  }
+
+  async function handleResign(p: Profile) {
+    if (p.id === myProfile?.id) {
+      alert('본인 계정은 퇴사 처리할 수 없습니다.');
+      return;
+    }
+    const confirmed = confirm(
+      `${p.display_name || p.email}님을 퇴사 처리하시겠습니까?\n\n확인 시 해당 직원은 즉시 커뮤니티 접근이 차단됩니다.`
+    );
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ resigned_at: new Date().toISOString() })
+      .eq('id', p.id);
+
+    if (error) {
+      alert('퇴사 처리 실패: ' + error.message);
+    } else {
+      await fetchProfiles();
+    }
   }
 
   async function handleSave(id: string) {
@@ -186,15 +214,34 @@ export default function EmployeesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">인원 관리</h1>
-          <p className="mt-2 text-gray-600">전체 {profiles.length}명의 인원을 관리하세요</p>
+          <p className="mt-2 text-gray-600">
+            재직 {activeProfiles.length}명
+            {resignedProfiles.length > 0 && (
+              <span className="ml-2 text-gray-400">· 퇴사 {resignedProfiles.length}명</span>
+            )}
+          </p>
         </div>
-        <button
-          onClick={exportCSV}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
-        >
-          <Download className="h-5 w-5" />
-          CSV 내보내기
-        </button>
+        <div className="flex items-center gap-3">
+          {isAdmin && resignedProfiles.length > 0 && (
+            <button
+              onClick={() => setShowResigned((v) => !v)}
+              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                showResigned
+                  ? 'border-red-300 bg-red-50 text-red-700'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {showResigned ? '퇴사자 숨기기' : `퇴사자 보기 (${resignedProfiles.length})`}
+            </button>
+          )}
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Download className="h-5 w-5" />
+            CSV 내보내기
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -238,7 +285,7 @@ export default function EmployeesPage() {
                     ? 'text-yellow-600'
                     : 'text-green-600';
                 return (
-                  <tr key={p.id} className="hover:bg-gray-50">
+                  <tr key={p.id} className={p.resigned_at ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white font-semibold">
@@ -366,14 +413,27 @@ export default function EmployeesPage() {
                               <X className="h-4 w-4" />
                             </button>
                           </div>
+                        ) : p.resigned_at ? (
+                          <span className="text-xs text-gray-400">
+                            퇴사 {format(new Date(p.resigned_at), 'yy.MM.dd')}
+                          </span>
                         ) : (
-                          <button
-                            onClick={() => startEdit(p)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="정보 수정"
-                          >
-                            <Edit className="h-5 w-5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => startEdit(p)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="정보 수정"
+                            >
+                              <Edit className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleResign(p)}
+                              className="text-red-400 hover:text-red-600"
+                              title="퇴사 처리"
+                            >
+                              <UserX className="h-5 w-5" />
+                            </button>
+                          </div>
                         )}
                       </td>
                     )}

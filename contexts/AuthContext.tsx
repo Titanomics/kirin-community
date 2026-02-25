@@ -11,6 +11,7 @@ interface UserProfile {
   role: 'admin' | 'user' | 'leader';
   joined_at: string | null;
   leave_adjustment: number;
+  resigned_at: string | null;
 }
 
 interface AuthContextType {
@@ -67,6 +68,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('id', userId)
         .single();
+
+      // 퇴사 처리된 계정은 즉시 로그아웃
+      if (data?.resigned_at) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        window.location.href = '/login?resigned=1';
+        return;
+      }
+
       setProfile(data);
     } catch (err) {
       console.error('프로필 로딩 실패:', err);
