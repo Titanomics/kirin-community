@@ -15,6 +15,7 @@ interface Profile {
   joined_at: string | null;
   birthday: string | null;
   created_at: string;
+  leave_adjustment: number;
 }
 
 interface LeaveRequest {
@@ -24,7 +25,7 @@ interface LeaveRequest {
   status: '대기' | '승인' | '반려';
 }
 
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[]) {
+function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
   if (!joinedAt) return null;
   const today = new Date();
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
@@ -33,7 +34,8 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
   if (years < 1) {
     const total = Math.min(totalMonths, 11);
     const used = approvedLeaves.filter((l) => l.leave_type === '월차').length;
-    return { kind: '월차' as const, total, used, remaining: Math.max(0, total - used) };
+    const remaining = Math.max(0, total - used) + adjustment;
+    return { kind: '월차' as const, total, used, remaining, adjustment };
   } else {
     const total = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
     const used = approvedLeaves.reduce((sum, l) => {
@@ -41,7 +43,8 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
       if (l.leave_type === '반차') return sum + 0.5;
       return sum;
     }, 0);
-    return { kind: '연차' as const, total, used, remaining: Math.max(0, total - used) };
+    const remaining = Math.max(0, total - used) + adjustment;
+    return { kind: '연차' as const, total, used, remaining, adjustment };
   }
 }
 
@@ -53,7 +56,7 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ joined_at: '', birthday: '', team: '', role: '' });
+  const [editForm, setEditForm] = useState({ joined_at: '', birthday: '', team: '', role: '', leave_adjustment: '0' });
   const [saving, setSaving] = useState(false);
 
   const isAdmin = myProfile?.role === 'admin';
@@ -121,16 +124,18 @@ export default function EmployeesPage() {
       birthday: p.birthday || '',
       team: p.team || '',
       role: p.role,
+      leave_adjustment: String(p.leave_adjustment ?? 0),
     });
   }
 
   async function handleSave(id: string) {
     setSaving(true);
-    const updateData: Record<string, string | null> = {
+    const updateData: Record<string, string | number | null> = {
       joined_at: editForm.joined_at || null,
       birthday: editForm.birthday || null,
       team: editForm.team || null,
       role: editForm.role,
+      leave_adjustment: parseInt(editForm.leave_adjustment, 10) || 0,
     };
 
     const { error } = await supabase
@@ -150,7 +155,7 @@ export default function EmployeesPage() {
   const exportCSV = () => {
     const headers = ['이름', '이메일', '역할', '팀', '입사일', '근속기간', '생일', '잔여연차/월차'];
     const data = profiles.map((p) => {
-      const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || []);
+      const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_adjustment ?? 0);
       const balanceStr = balance ? `${balance.kind} ${balance.remaining}/${balance.total}` : '-';
       return [
         p.display_name || '-',
@@ -223,7 +228,7 @@ export default function EmployeesPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {filteredProfiles.map((p) => {
-                const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || []);
+                const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_adjustment ?? 0);
                 const balanceColor =
                   !balance
                     ? 'text-gray-400'
@@ -307,13 +312,35 @@ export default function EmployeesPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm">
-                      {balance ? (
+                      {editingId === p.id ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-gray-500">
+                            자동계산: {balance ? `${Math.max(0, balance.remaining - (parseInt(editForm.leave_adjustment, 10) || 0))}개` : '-'}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">조정</span>
+                            <input
+                              type="number"
+                              value={editForm.leave_adjustment}
+                              onChange={(e) => setEditForm({ ...editForm, leave_adjustment: e.target.value })}
+                              className="w-16 rounded border border-gray-300 px-2 py-1 text-sm text-center"
+                              placeholder="0"
+                            />
+                            <span className="text-xs text-gray-400">일</span>
+                          </div>
+                        </div>
+                      ) : balance ? (
                         <div>
                           <span className={`font-semibold ${balanceColor}`}>
                             {balance.remaining}
                           </span>
                           <span className="text-gray-400"> / {balance.total}</span>
                           <span className="ml-1 text-xs text-gray-500">{balance.kind}</span>
+                          {balance.adjustment !== 0 && (
+                            <span className={`ml-1 text-xs ${balance.adjustment > 0 ? 'text-blue-500' : 'text-red-400'}`}>
+                              ({balance.adjustment > 0 ? '+' : ''}{balance.adjustment})
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-gray-400">-</span>

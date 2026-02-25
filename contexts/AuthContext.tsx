@@ -9,6 +9,8 @@ interface UserProfile {
   email: string | null;
   display_name: string | null;
   role: 'admin' | 'user' | 'leader';
+  joined_at: string | null;
+  leave_adjustment: number;
 }
 
 interface AuthContextType {

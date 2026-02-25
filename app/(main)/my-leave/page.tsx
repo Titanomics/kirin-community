@@ -16,7 +16,7 @@ interface LeaveRequest {
   created_at: string;
 }
 
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[]) {
+function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
   if (!joinedAt) return null;
   const today = new Date();
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
@@ -25,11 +25,13 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
   if (years < 1) {
     const total = Math.min(totalMonths, 11);
     const used = approvedLeaves.filter((l) => l.leave_type === '월차').length;
+    const remaining = Math.max(0, total - used) + adjustment;
     return {
       kind: '월차' as const,
       total,
       used,
-      remaining: Math.max(0, total - used),
+      remaining,
+      adjustment,
       note: `입사 후 ${totalMonths}개월 경과 · 매월 1개 자동 부여 (최대 11개)`,
     };
   } else {
@@ -39,11 +41,13 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
       if (l.leave_type === '반차') return sum + 0.5;
       return sum;
     }, 0);
+    const remaining = Math.max(0, total - used) + adjustment;
     return {
       kind: '연차' as const,
       total,
       used,
-      remaining: Math.max(0, total - used),
+      remaining,
+      adjustment,
       note: `근속 ${years}년 · 기본 15일 + 추가 ${total - 15}일`,
     };
   }
@@ -124,7 +128,7 @@ export default function MyLeavePage() {
 
   const approvedLeaves = leaves.filter((l) => l.status === '승인');
   const pendingCount = leaves.filter((l) => l.status === '대기').length;
-  const balance = calcLeaveBalance(profile?.joined_at ?? null, approvedLeaves);
+  const balance = calcLeaveBalance(profile?.joined_at ?? null, approvedLeaves, profile?.leave_adjustment ?? 0);
 
   return (
     <div className="space-y-6">
@@ -153,6 +157,11 @@ export default function MyLeavePage() {
                 <span className="text-xl text-blue-200">/ {balance.total}개</span>
               </div>
               <p className="mt-2 text-sm text-blue-100">{balance.note}</p>
+              {balance.adjustment !== 0 && (
+                <p className="mt-0.5 text-xs text-blue-200">
+                  관리자 조정: {balance.adjustment > 0 ? '+' : ''}{balance.adjustment}일 적용됨
+                </p>
+              )}
             </div>
             <div className="text-right">
               <p className="text-sm text-blue-100">사용</p>
