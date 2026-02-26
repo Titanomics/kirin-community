@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, isToday } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Save, X, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Plus, Trash2, Save } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -49,6 +49,7 @@ function getStatusBadge(r: AttendanceRecord | undefined): { label: string; color
 }
 
 const NOTE_PRESETS = ['외근', '재택', '출장', '반차'];
+const DAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
 export default function AttendanceAdminPage() {
   const { profile: myProfile } = useAuth();
@@ -60,17 +61,17 @@ export default function AttendanceAdminPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
 
-  // 수정
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ check_in: '', check_out: '', note: '' });
-  const [saving, setSaving] = useState(false);
+  // 날짜 상세 모달
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-  // 추가 모달
+  // 추가/수정 모달
   const [addModal, setAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ user_id: '', date: '', check_in: '', check_out: '', note: '' });
   const [addSaving, setAddSaving] = useState(false);
+
+  // 오늘 수동 출퇴근
+  const [manualTarget, setManualTarget] = useState<string | null>(null);
 
   const isAdmin = myProfile?.role === 'admin';
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -78,10 +79,9 @@ export default function AttendanceAdminPage() {
   const fetchData = useCallback(async () => {
     const monthStart = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
     const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-
     const [profilesRes, monthRes, todayRes] = await Promise.all([
       supabase.from('profiles').select('id, display_name, email, team').is('resigned_at', null).neq('role', 'admin').order('display_name'),
-      supabase.from('attendance').select('*').gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false }),
+      supabase.from('attendance').select('*').gte('date', monthStart).lte('date', monthEnd),
       supabase.from('attendance').select('*').eq('date', today),
     ]);
     setProfiles(profilesRes.data || []);
@@ -93,22 +93,6 @@ export default function AttendanceAdminPage() {
     if (isAdmin) fetchData().finally(() => setLoading(false));
     else setLoading(false);
   }, [isAdmin, fetchData]);
-
-  async function handleSaveEdit(id: string) {
-    setSaving(true);
-    const { error } = await supabase
-      .from('attendance')
-      .update({
-        check_in: editForm.check_in || null,
-        check_out: editForm.check_out || null,
-        note: editForm.note || null,
-        status: editForm.check_out ? 'checked_out' : 'checked_in',
-      })
-      .eq('id', id);
-    if (error) alert('저장 실패: ' + error.message);
-    else { setEditingId(null); await fetchData(); }
-    setSaving(false);
-  }
 
   async function handleDelete(id: string) {
     if (!confirm('이 출퇴근 기록을 삭제하시겠습니까?')) return;
@@ -124,7 +108,7 @@ export default function AttendanceAdminPage() {
       { onConflict: 'user_id,date' }
     );
     if (error) alert('출근 처리 실패: ' + error.message);
-    else await fetchData();
+    else { setManualTarget(null); await fetchData(); }
   }
 
   async function handleManualCheckOut(userId: string) {
@@ -136,74 +120,48 @@ export default function AttendanceAdminPage() {
   }
 
   async function handleAddRecord() {
-    if (!addForm.user_id || !addForm.date) {
-      alert('직원과 날짜를 선택해주세요.');
-      return;
-    }
+    if (!addForm.user_id || !addForm.date) { alert('직원과 날짜를 선택해주세요.'); return; }
     setAddSaving(true);
     const checkIn = addForm.check_in ? `${addForm.date}T${addForm.check_in}:00+09:00` : null;
     const checkOut = addForm.check_out ? `${addForm.date}T${addForm.check_out}:00+09:00` : null;
     const { error } = await supabase.from('attendance').upsert(
-      {
-        user_id: addForm.user_id,
-        date: addForm.date,
-        check_in: checkIn,
-        check_out: checkOut,
-        status: checkOut ? 'checked_out' : 'checked_in',
-        note: addForm.note || null,
-      },
+      { user_id: addForm.user_id, date: addForm.date, check_in: checkIn, check_out: checkOut, status: checkOut ? 'checked_out' : 'checked_in', note: addForm.note || null },
       { onConflict: 'user_id,date' }
     );
-    if (error) alert('추가 실패: ' + error.message);
-    else {
-      setAddModal(false);
-      setAddForm({ user_id: '', date: today, check_in: '', check_out: '', note: '' });
-      await fetchData();
-    }
+    if (error) alert('저장 실패: ' + error.message);
+    else { setAddModal(false); setAddForm({ user_id: '', date: today, check_in: '', check_out: '', note: '' }); await fetchData(); }
     setAddSaving(false);
   }
 
-  function toggleCollapse(date: string) {
-    setCollapsedDates((prev) => {
-      const next = new Set(prev);
-      if (next.has(date)) next.delete(date);
-      else next.add(date);
-      return next;
-    });
-  }
+  if (!isAdmin) return <div className="flex h-64 items-center justify-center text-gray-400">관리자만 접근 가능합니다.</div>;
+  if (loading) return <div className="flex h-64 items-center justify-center text-gray-400">불러오는 중...</div>;
 
-  if (!isAdmin) {
-    return <div className="flex h-64 items-center justify-center text-gray-400">관리자만 접근 가능합니다.</div>;
-  }
-  if (loading) {
-    return <div className="flex h-64 items-center justify-center text-gray-400">불러오는 중...</div>;
-  }
-
+  // 데이터 맵
   const todayMap = Object.fromEntries(todayRecords.map((r) => [r.user_id, r]));
   const checkedIn = profiles.filter((p) => todayMap[p.id]?.check_in && !todayMap[p.id]?.check_out).length;
   const checkedOut = profiles.filter((p) => todayMap[p.id]?.check_out).length;
   const absent = profiles.filter((p) => !todayMap[p.id]?.check_in).length;
 
-  // 일자별 record 맵: { date: { userId: record } }
+  // 월 전체 record matrix
   const recordMatrix: Record<string, Record<string, AttendanceRecord>> = {};
   for (const r of records) {
     if (!recordMatrix[r.date]) recordMatrix[r.date] = {};
     recordMatrix[r.date][r.user_id] = r;
   }
 
-  // 이번 달 전체 날짜 (내림차순)
-  const allDatesInMonth = eachDayOfInterval({
-    start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth),
-  })
-    .reverse()
-    .map((d) => format(d, 'yyyy-MM-dd'));
+  // 달력 주 배열 만들기 (월요일 시작)
+  const firstDay = startOfMonth(currentMonth);
+  const lastDay = endOfMonth(currentMonth);
+  const allDays = eachDayOfInterval({ start: firstDay, end: lastDay });
+  const startPad = (firstDay.getDay() + 6) % 7; // 0=Mon
+  const calendarDays: (Date | null)[] = [...Array(startPad).fill(null), ...allDays];
+  while (calendarDays.length % 7 !== 0) calendarDays.push(null);
+  const weeks: (Date | null)[][] = [];
+  for (let i = 0; i < calendarDays.length; i += 7) weeks.push(calendarDays.slice(i, i + 7));
 
-  // 기록이 있는 날짜만
-  const datesWithRecords = allDatesInMonth.filter((d) => recordMatrix[d]);
-
-  // 특정 직원 선택 시: 해당 직원 기록만 필터
-  const singleUserRecords = records.filter((r) => selectedUserId !== 'all' && r.user_id === selectedUserId);
+  // 날짜 상세 모달 데이터
+  const selectedDayRecords = selectedDate ? (recordMatrix[selectedDate] || {}) : {};
+  const selectedProfile = profiles.find((p) => p.id === selectedUserId);
 
   return (
     <div className="space-y-6">
@@ -240,6 +198,7 @@ export default function AttendanceAdminPage() {
             const mins = r ? calculateWorkMinutes(r.check_in, r.check_out) : null;
             const isAbsent = !r?.check_in;
             const isWorking = r?.check_in && !r?.check_out;
+            const isManual = manualTarget === p.id;
 
             return (
               <div key={p.id} className="flex items-center justify-between px-6 py-3 flex-wrap gap-2">
@@ -259,11 +218,20 @@ export default function AttendanceAdminPage() {
                   {mins !== null && <span className="text-xs text-gray-400">{formatMinutes(mins)}</span>}
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.color}`}>{badge.label}</span>
                   {r?.note && <span className="text-xs text-gray-400 hidden sm:inline">{r.note}</span>}
-                  {isAbsent && <ManualCheckInButton onCheckIn={(note) => handleManualCheckIn(p.id, note)} />}
+                  {isAbsent && !isManual && (
+                    <button onClick={() => setManualTarget(p.id)} className="text-xs px-2 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50">출근 처리</button>
+                  )}
+                  {isAbsent && isManual && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <button onClick={() => handleManualCheckIn(p.id, '')} className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">일반</button>
+                      {NOTE_PRESETS.map((n) => (
+                        <button key={n} onClick={() => handleManualCheckIn(p.id, n)} className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">{n}</button>
+                      ))}
+                      <button onClick={() => setManualTarget(null)} className="text-gray-400"><X className="h-3.5 w-3.5" /></button>
+                    </div>
+                  )}
                   {isWorking && (
-                    <button onClick={() => handleManualCheckOut(p.id)} className="text-xs px-2 py-1 rounded border border-orange-300 text-orange-600 hover:bg-orange-50">
-                      퇴근 처리
-                    </button>
+                    <button onClick={() => handleManualCheckOut(p.id)} className="text-xs px-2 py-1 rounded border border-orange-300 text-orange-600 hover:bg-orange-50">퇴근 처리</button>
                   )}
                 </div>
               </div>
@@ -272,27 +240,24 @@ export default function AttendanceAdminPage() {
         </div>
       </div>
 
-      {/* 월간 기록 - 일자별 */}
+      {/* 월간 달력 */}
       <div className="rounded-xl bg-white shadow-sm border border-gray-100">
+        {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 flex-wrap gap-3">
           <h2 className="text-lg font-semibold text-gray-900">월간 기록</h2>
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => {
-                setAddForm({ user_id: profiles[0]?.id || '', date: today, check_in: '', check_out: '', note: '' });
-                setAddModal(true);
-              }}
+              onClick={() => { setAddForm({ user_id: profiles[0]?.id || '', date: today, check_in: '', check_out: '', note: '' }); setAddModal(true); }}
               className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
             >
-              <Plus className="h-4 w-4" />
-              기록 추가
+              <Plus className="h-4 w-4" />기록 추가
             </button>
             <select
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
               className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
             >
-              <option value="all">전체 직원 (일자별)</option>
+              <option value="all">전체 직원</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>{p.display_name || p.email}</option>
               ))}
@@ -309,237 +274,169 @@ export default function AttendanceAdminPage() {
           </div>
         </div>
 
-        {/* 전체 직원: 일자별 그룹뷰 */}
-        {selectedUserId === 'all' ? (
-          datesWithRecords.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 text-sm">기록이 없습니다.</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {datesWithRecords.map((date) => {
-                const dayRecords = recordMatrix[date] || {};
-                const dateObj = new Date(date + 'T00:00:00');
-                const weekend = isWeekend(dateObj);
-                const presentCount = Object.values(dayRecords).filter((r) => r.check_in).length;
-                const isCollapsed = collapsedDates.has(date);
+        {/* 요일 헤더 */}
+        <div className="grid grid-cols-7 border-b border-gray-100">
+          {DAY_LABELS.map((d, i) => (
+            <div key={d} className={`py-2 text-center text-xs font-semibold ${i === 5 ? 'text-blue-400' : i === 6 ? 'text-red-400' : 'text-gray-500'}`}>
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* 달력 그리드 */}
+        <div>
+          {weeks.map((week, wi) => (
+            <div key={wi} className="grid grid-cols-7 border-b border-gray-50 last:border-b-0">
+              {week.map((day, di) => {
+                if (!day) return <div key={di} className="min-h-[80px] bg-gray-50/40" />;
+
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const dayRecords = recordMatrix[dateStr] || {};
+                const weekend = isWeekend(day);
+                const todayFlag = isToday(day);
+                const isFuture = day > new Date();
+                const isSat = di === 5;
+                const isSun = di === 6;
+
+                // 전체 직원 뷰: 출근 현황 요약
+                const presentCount = profiles.filter((p) => dayRecords[p.id]?.check_in).length;
+                const totalCount = profiles.length;
+                const hasAny = presentCount > 0;
+
+                // 단일 직원 뷰: 해당 직원 기록
+                const singleRecord = selectedUserId !== 'all' ? dayRecords[selectedUserId] : undefined;
+                const singleBadge = getStatusBadge(singleRecord);
 
                 return (
-                  <div key={date}>
-                    {/* 날짜 헤더 */}
-                    <button
-                      onClick={() => toggleCollapse(date)}
-                      className={`w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors ${weekend ? 'bg-gray-50' : ''}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`text-sm font-semibold ${weekend ? 'text-gray-400' : 'text-gray-800'}`}>
-                          {format(dateObj, 'M월 d일 (EEEE)', { locale: ko })}
-                        </span>
-                        {weekend && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">주말</span>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-500">
-                          출근 <span className="font-semibold text-blue-600">{presentCount}</span> / {profiles.length}명
-                        </span>
-                        {profiles.length - presentCount > 0 && (
-                          <span className="text-xs text-red-400">미출근 {profiles.length - presentCount}명</span>
+                  <div
+                    key={di}
+                    onClick={() => !isFuture && setSelectedDate(dateStr)}
+                    className={`min-h-[80px] p-2 border-r border-gray-50 last:border-r-0 flex flex-col gap-1 transition-colors
+                      ${isFuture ? 'bg-gray-50/30 cursor-default' : 'cursor-pointer hover:bg-blue-50/40'}
+                      ${todayFlag ? 'bg-blue-50/60' : ''}
+                      ${weekend && !todayFlag ? 'bg-gray-50/50' : ''}
+                      ${selectedDate === dateStr ? 'ring-2 ring-inset ring-blue-400' : ''}
+                    `}
+                  >
+                    {/* 날짜 숫자 */}
+                    <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full
+                      ${todayFlag ? 'bg-blue-600 text-white' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-700'}
+                    `}>
+                      {format(day, 'd')}
+                    </div>
+
+                    {/* 전체 직원 뷰 */}
+                    {selectedUserId === 'all' && !isFuture && (
+                      <>
+                        {hasAny ? (
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium
+                            ${presentCount === totalCount ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}
+                          `}>
+                            출근 {presentCount}/{totalCount}
+                          </span>
+                        ) : (
+                          !weekend && <span className="text-xs text-gray-300">-</span>
                         )}
-                        {isCollapsed ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronUp className="h-4 w-4 text-gray-400" />}
-                      </div>
-                    </button>
+                        {/* 미출근 인원 dot */}
+                        {hasAny && presentCount < totalCount && (
+                          <span className="text-xs text-red-400">미출근 {totalCount - presentCount}명</span>
+                        )}
+                      </>
+                    )}
 
-                    {/* 직원별 상세 */}
-                    {!isCollapsed && (
-                      <div className="divide-y divide-gray-50 bg-gray-50/30">
-                        {profiles.map((p) => {
-                          const r = dayRecords[p.id];
-                          const badge = getStatusBadge(r);
-                          const mins = r ? calculateWorkMinutes(r.check_in, r.check_out) : null;
-                          const isEditing = editingId === r?.id;
-
-                          return (
-                            <div key={p.id} className="px-6 py-2.5 pl-10">
-                              {isEditing && r ? (
-                                <div className="flex items-center gap-3 flex-wrap">
-                                  <span className="text-sm text-gray-700 w-20 shrink-0">{p.display_name || p.email}</span>
-                                  <input
-                                    type="time"
-                                    value={editForm.check_in ? format(new Date(editForm.check_in), 'HH:mm') : ''}
-                                    onChange={(e) => setEditForm({ ...editForm, check_in: e.target.value ? `${r.date}T${e.target.value}:00+09:00` : '' })}
-                                    className="rounded border border-gray-300 px-2 py-1 text-sm"
-                                  />
-                                  <span className="text-gray-300 text-xs">→</span>
-                                  <input
-                                    type="time"
-                                    value={editForm.check_out ? format(new Date(editForm.check_out), 'HH:mm') : ''}
-                                    onChange={(e) => setEditForm({ ...editForm, check_out: e.target.value ? `${r.date}T${e.target.value}:00+09:00` : '' })}
-                                    className="rounded border border-gray-300 px-2 py-1 text-sm"
-                                  />
-                                  <div className="flex gap-1 flex-wrap">
-                                    {NOTE_PRESETS.map((n) => (
-                                      <button key={n} onClick={() => setEditForm({ ...editForm, note: editForm.note === n ? '' : n })}
-                                        className={`text-xs px-2 py-0.5 rounded-full border ${editForm.note === n ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-500'}`}>
-                                        {n}
-                                      </button>
-                                    ))}
-                                    <input type="text" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
-                                      placeholder="메모" className="rounded border border-gray-300 px-2 py-0.5 text-xs w-16" />
-                                  </div>
-                                  <button onClick={() => handleSaveEdit(r.id)} disabled={saving} className="rounded bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
-                                    <Save className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button onClick={() => setEditingId(null)} className="rounded bg-gray-200 p-1.5 text-gray-600 hover:bg-gray-300">
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center text-xs font-semibold text-white shrink-0">
-                                      {(p.display_name || p.email || '?').charAt(0)}
-                                    </div>
-                                    <span className="text-sm text-gray-700 w-16 sm:w-24 truncate">{p.display_name || p.email}</span>
-                                  </div>
-                                  <div className="flex items-center gap-3 text-sm tabular-nums">
-                                    <span className={r?.check_in ? 'text-gray-700' : 'text-gray-300'}>
-                                      {r?.check_in ? format(new Date(r.check_in), 'HH:mm') : '--:--'}
-                                    </span>
-                                    <span className="text-gray-300 text-xs">→</span>
-                                    <span className={r?.check_out ? 'text-gray-700' : 'text-gray-300'}>
-                                      {r?.check_out ? format(new Date(r.check_out), 'HH:mm') : '--:--'}
-                                    </span>
-                                    {mins !== null && <span className="text-xs text-gray-400 hidden sm:inline">{formatMinutes(mins)}</span>}
-                                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.color}`}>{badge.label}</span>
-                                    {r?.note && <span className="text-xs text-gray-400 hidden sm:inline">{r.note}</span>}
-                                    {r ? (
-                                      <div className="flex items-center gap-2">
-                                        <button onClick={() => { setEditingId(r.id); setEditForm({ check_in: r.check_in || '', check_out: r.check_out || '', note: r.note || '' }); }}
-                                          className="text-xs text-blue-400 hover:text-blue-600">수정</button>
-                                        <button onClick={() => handleDelete(r.id)} className="text-gray-300 hover:text-red-400">
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <button
-                                        onClick={() => { setAddForm({ user_id: p.id, date, check_in: '', check_out: '', note: '' }); setAddModal(true); }}
-                                        className="text-xs text-gray-400 hover:text-blue-500 flex items-center gap-0.5"
-                                      >
-                                        <Plus className="h-3 w-3" />추가
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                    {/* 단일 직원 뷰 */}
+                    {selectedUserId !== 'all' && !isFuture && (
+                      <>
+                        {singleRecord?.check_in ? (
+                          <>
+                            <span className="text-xs text-gray-600 tabular-nums">{format(new Date(singleRecord.check_in), 'HH:mm')}</span>
+                            {singleRecord.check_out && (
+                              <span className="text-xs text-gray-400 tabular-nums">{format(new Date(singleRecord.check_out), 'HH:mm')}</span>
+                            )}
+                            <span className={`text-xs px-1 py-0.5 rounded font-medium ${singleBadge.color}`}>{singleBadge.label}</span>
+                            {singleRecord.note && <span className="text-xs text-gray-400">{singleRecord.note}</span>}
+                          </>
+                        ) : (
+                          !weekend && <span className="text-xs text-gray-300">미출근</span>
+                        )}
+                      </>
                     )}
                   </div>
                 );
               })}
             </div>
-          )
-        ) : (
-          /* 특정 직원 선택 시: 해당 직원 목록뷰 */
-          singleUserRecords.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 text-sm">기록이 없습니다.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {['날짜', '출근', '퇴근', '근무시간', '상태', '메모', ''].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {singleUserRecords.map((r) => {
-                    const badge = getStatusBadge(r);
-                    const mins = calculateWorkMinutes(r.check_in, r.check_out);
-                    const isEditing = editingId === r.id;
-                    const dateObj = new Date(r.date + 'T00:00:00');
-                    const weekend = isWeekend(dateObj);
-
-                    if (isEditing) {
-                      return (
-                        <tr key={r.id} className="bg-blue-50">
-                          <td className="px-4 py-3 text-sm text-gray-700">{format(dateObj, 'M/d (EEE)', { locale: ko })}</td>
-                          <td className="px-4 py-3">
-                            <input type="time" value={editForm.check_in ? format(new Date(editForm.check_in), 'HH:mm') : ''}
-                              onChange={(e) => setEditForm({ ...editForm, check_in: e.target.value ? `${r.date}T${e.target.value}:00+09:00` : '' })}
-                              className="rounded border border-gray-300 px-2 py-1 text-sm" />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input type="time" value={editForm.check_out ? format(new Date(editForm.check_out), 'HH:mm') : ''}
-                              onChange={(e) => setEditForm({ ...editForm, check_out: e.target.value ? `${r.date}T${e.target.value}:00+09:00` : '' })}
-                              className="rounded border border-gray-300 px-2 py-1 text-sm" />
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-400">-</td>
-                          <td className="px-4 py-3 text-sm text-gray-400">-</td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-1 flex-wrap">
-                              {NOTE_PRESETS.map((n) => (
-                                <button key={n} onClick={() => setEditForm({ ...editForm, note: editForm.note === n ? '' : n })}
-                                  className={`text-xs px-2 py-0.5 rounded-full border ${editForm.note === n ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-500'}`}>
-                                  {n}
-                                </button>
-                              ))}
-                              <input type="text" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
-                                placeholder="직접 입력" className="rounded border border-gray-300 px-2 py-0.5 text-xs w-20" />
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-1">
-                              <button onClick={() => handleSaveEdit(r.id)} disabled={saving} className="rounded bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
-                                <Save className="h-3.5 w-3.5" />
-                              </button>
-                              <button onClick={() => setEditingId(null)} className="rounded bg-gray-200 p-1.5 text-gray-600 hover:bg-gray-300">
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    return (
-                      <tr key={r.id} className={`hover:bg-gray-50 ${weekend ? 'bg-gray-50/60' : ''}`}>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {format(dateObj, 'M/d (EEE)', { locale: ko })}
-                          {weekend && <span className="ml-1 text-xs text-gray-300">주말</span>}
-                        </td>
-                        <td className="px-4 py-3 text-sm tabular-nums">{r.check_in ? format(new Date(r.check_in), 'HH:mm') : '-'}</td>
-                        <td className="px-4 py-3 text-sm tabular-nums">{r.check_out ? format(new Date(r.check_out), 'HH:mm') : '-'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{formatMinutes(mins)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.color}`}>{badge.label}</span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-400">{r.note || '-'}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => { setEditingId(r.id); setEditForm({ check_in: r.check_in || '', check_out: r.check_out || '', note: r.note || '' }); }}
-                              className="text-xs text-blue-500 hover:text-blue-700">수정</button>
-                            <button onClick={() => handleDelete(r.id)} className="text-gray-300 hover:text-red-500">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
-        )}
+          ))}
+        </div>
       </div>
 
-      {/* 기록 추가 모달 */}
+      {/* 날짜 상세 모달 */}
+      {selectedDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {format(new Date(selectedDate + 'T00:00:00'), 'M월 d일 (EEEE)', { locale: ko })}
+                </h3>
+                {selectedUserId !== 'all' && selectedProfile && (
+                  <p className="text-sm text-gray-500">{selectedProfile.display_name || selectedProfile.email}</p>
+                )}
+              </div>
+              <button onClick={() => setSelectedDate(null)} className="rounded-full p-1 hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="divide-y divide-gray-50 max-h-[60vh] overflow-y-auto">
+              {(selectedUserId === 'all' ? profiles : profiles.filter((p) => p.id === selectedUserId)).map((p) => {
+                const r = selectedDayRecords[p.id];
+                const badge = getStatusBadge(r);
+                const mins = r ? calculateWorkMinutes(r.check_in, r.check_out) : null;
+
+                return (
+                  <DayDetailRow
+                    key={p.id}
+                    profile={p}
+                    record={r}
+                    badge={badge}
+                    mins={mins}
+                    onEdit={() => {
+                      setAddForm({
+                        user_id: p.id,
+                        date: selectedDate,
+                        check_in: r?.check_in ? format(new Date(r.check_in), 'HH:mm') : '',
+                        check_out: r?.check_out ? format(new Date(r.check_out), 'HH:mm') : '',
+                        note: r?.note || '',
+                      });
+                      setSelectedDate(null);
+                      setAddModal(true);
+                    }}
+                    onAdd={() => {
+                      setAddForm({ user_id: p.id, date: selectedDate, check_in: '', check_out: '', note: '' });
+                      setSelectedDate(null);
+                      setAddModal(true);
+                    }}
+                    onDelete={() => r && handleDelete(r.id)}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setSelectedDate(null)} className="w-full rounded-lg border border-gray-300 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 기록 추가/수정 모달 */}
       {addModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-semibold text-gray-900">출퇴근 기록 추가</h3>
+              <h3 className="text-lg font-semibold text-gray-900">출퇴근 기록 {addForm.check_in ? '수정' : '추가'}</h3>
               <button onClick={() => setAddModal(false)} className="rounded-full p-1 hover:bg-gray-100">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
@@ -550,9 +447,7 @@ export default function AttendanceAdminPage() {
                 <select value={addForm.user_id} onChange={(e) => setAddForm({ ...addForm, user_id: e.target.value })}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
                   <option value="">직원 선택</option>
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>{p.display_name || p.email}</option>
-                  ))}
+                  {profiles.map((p) => <option key={p.id} value={p.id}>{p.display_name || p.email}</option>)}
                 </select>
               </div>
               <div>
@@ -587,9 +482,7 @@ export default function AttendanceAdminPage() {
               </div>
             </div>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setAddModal(false)} className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                취소
-              </button>
+              <button onClick={() => setAddModal(false)} className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">취소</button>
               <button onClick={handleAddRecord} disabled={addSaving} className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                 {addSaving ? '저장 중...' : '저장'}
               </button>
@@ -601,24 +494,55 @@ export default function AttendanceAdminPage() {
   );
 }
 
-function ManualCheckInButton({ onCheckIn }: { onCheckIn: (note: string) => void }) {
-  const [open, setOpen] = useState(false);
-
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="text-xs px-2 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50">
-        출근 처리
-      </button>
-    );
-  }
-
+function DayDetailRow({
+  profile, record, badge, mins, onEdit, onAdd, onDelete,
+}: {
+  profile: Profile;
+  record: AttendanceRecord | undefined;
+  badge: { label: string; color: string };
+  mins: number | null;
+  onEdit: () => void;
+  onAdd: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <div className="flex items-center gap-1 flex-wrap">
-      <button onClick={() => { onCheckIn(''); setOpen(false); }} className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">일반</button>
-      {NOTE_PRESETS.map((n) => (
-        <button key={n} onClick={() => { onCheckIn(n); setOpen(false); }} className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">{n}</button>
-      ))}
-      <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="h-3.5 w-3.5" /></button>
+    <div className="flex items-center justify-between px-6 py-3">
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-semibold text-white shrink-0">
+          {(profile.display_name || profile.email || '?').charAt(0)}
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-900">{profile.display_name || profile.email}</p>
+          <p className="text-xs text-gray-400">{profile.team || '미지정'}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 text-sm tabular-nums">
+        {record?.check_in ? (
+          <>
+            <span className="text-gray-700">{format(new Date(record.check_in), 'HH:mm')}</span>
+            <span className="text-gray-300 text-xs">→</span>
+            <span className={record.check_out ? 'text-gray-700' : 'text-gray-300'}>
+              {record.check_out ? format(new Date(record.check_out), 'HH:mm') : '--:--'}
+            </span>
+            {mins !== null && <span className="text-xs text-gray-400 hidden sm:inline">{formatMinutes(mins)}</span>}
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.color}`}>{badge.label}</span>
+            {record.note && <span className="text-xs text-gray-400">{record.note}</span>}
+            <button onClick={onEdit} className="text-xs text-blue-400 hover:text-blue-600 flex items-center gap-0.5">
+              <Save className="h-3 w-3" />수정
+            </button>
+            <button onClick={onDelete} className="text-gray-300 hover:text-red-400">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.color}`}>{badge.label}</span>
+            <button onClick={onAdd} className="text-xs text-blue-400 hover:text-blue-600 flex items-center gap-0.5">
+              <Plus className="h-3 w-3" />출근 처리
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
