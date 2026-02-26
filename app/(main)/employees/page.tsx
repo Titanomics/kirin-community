@@ -167,7 +167,7 @@ export default function EmployeesPage() {
       birthday: editForm.birthday || null,
       team: editForm.team || null,
       role: editForm.role,
-      leave_adjustment: parseInt(editForm.leave_adjustment, 10) || 0,
+      leave_adjustment: parseFloat(editForm.leave_adjustment) || 0,
     };
 
     const { error } = await supabase
@@ -366,7 +366,7 @@ export default function EmployeesPage() {
                       {editingId === p.id ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-xs text-gray-500">
-                            자동계산: {balance ? `${Math.max(0, balance.remaining - (parseInt(editForm.leave_adjustment, 10) || 0))}개` : '-'}
+                            자동계산: {balance ? `${Math.max(0, balance.remaining - (parseFloat(editForm.leave_adjustment) || 0))}개` : '-'}
                           </span>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-gray-500">조정</span>
