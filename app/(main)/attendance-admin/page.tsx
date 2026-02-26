@@ -1,11 +1,29 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, isToday, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, Plus, Trash2, Save } from 'lucide-react';
+import Holidays from 'date-holidays';
+
+function getKoreanHolidays(year: number): Record<string, string> {
+  const hd = new Holidays('KR');
+  const map: Record<string, string> = {};
+  for (const h of hd.getHolidays(year)) {
+    if (h.type !== 'public') continue;
+    const dateStr = h.date.substring(0, 10);
+    map[dateStr] = h.name;
+    // 설날/추석 연휴: 전날·다음날도 추가
+    if (h.name === '설날' || h.name === '추석') {
+      const d = new Date(dateStr + 'T00:00:00');
+      map[format(subDays(d, 1), 'yyyy-MM-dd')] = h.name + ' 연휴';
+      map[format(addDays(d, 1), 'yyyy-MM-dd')] = h.name + ' 연휴';
+    }
+  }
+  return map;
+}
 
 interface Profile {
   id: string;
@@ -61,6 +79,8 @@ export default function AttendanceAdminPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const holidayMap = useMemo(() => getKoreanHolidays(currentMonth.getFullYear()), [currentMonth.getFullYear()]);
 
   // 날짜 상세 모달
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -297,6 +317,8 @@ export default function AttendanceAdminPage() {
                 const isFuture = day > new Date();
                 const isSat = di === 5;
                 const isSun = di === 6;
+                const holidayName = holidayMap[dateStr];
+                const isHoliday = !!holidayName;
 
                 // 전체 직원 뷰: 출근 현황 요약
                 const presentCount = profiles.filter((p) => dayRecords[p.id]?.check_in).length;
@@ -314,16 +336,21 @@ export default function AttendanceAdminPage() {
                     className={`min-h-[80px] p-2 border-r border-gray-50 last:border-r-0 flex flex-col gap-1 transition-colors
                       ${isFuture ? 'bg-gray-50/30 cursor-default' : 'cursor-pointer hover:bg-blue-50/40'}
                       ${todayFlag ? 'bg-blue-50/60' : ''}
-                      ${weekend && !todayFlag ? 'bg-gray-50/50' : ''}
+                      ${(weekend || isHoliday) && !todayFlag ? 'bg-red-50/30' : ''}
                       ${selectedDate === dateStr ? 'ring-2 ring-inset ring-blue-400' : ''}
                     `}
                   >
                     {/* 날짜 숫자 */}
                     <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full
-                      ${todayFlag ? 'bg-blue-600 text-white' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-700'}
+                      ${todayFlag ? 'bg-blue-600 text-white' : (isSun || isHoliday) ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-700'}
                     `}>
                       {format(day, 'd')}
                     </div>
+
+                    {/* 공휴일 이름 */}
+                    {holidayName && (
+                      <span className="text-xs text-red-400 font-medium leading-tight truncate">{holidayName}</span>
+                    )}
 
                     {/* 전체 직원 뷰 */}
                     {selectedUserId === 'all' && !isFuture && (
@@ -335,9 +362,9 @@ export default function AttendanceAdminPage() {
                             출근 {presentCount}/{totalCount}
                           </span>
                         ) : (
-                          !weekend && <span className="text-xs text-gray-300">-</span>
+                          !(weekend || isHoliday) && <span className="text-xs text-gray-300">-</span>
                         )}
-                        {/* 미출근 인원 dot */}
+                        {/* 미출근 인원 */}
                         {hasAny && presentCount < totalCount && (
                           <span className="text-xs text-red-400">미출근 {totalCount - presentCount}명</span>
                         )}
@@ -357,7 +384,7 @@ export default function AttendanceAdminPage() {
                             {singleRecord.note && <span className="text-xs text-gray-400">{singleRecord.note}</span>}
                           </>
                         ) : (
-                          !weekend && <span className="text-xs text-gray-300">미출근</span>
+                          !(weekend || isHoliday) && <span className="text-xs text-gray-300">미출근</span>
                         )}
                       </>
                     )}
