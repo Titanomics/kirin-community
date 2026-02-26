@@ -1,12 +1,14 @@
 'use client';
 
-import { Bell, Search, LogOut, Moon, Sun } from 'lucide-react';
+import { Bell, Search, LogOut, Moon, Sun, Menu } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDarkMode } from '@/contexts/DarkModeContext';
+import { useMobileMenu } from '@/contexts/MobileMenuContext';
 
 export default function Header() {
   const { user, profile, signOut } = useAuth();
   const { isDark, toggle } = useDarkMode();
+  const { toggle: toggleMenu } = useMobileMenu();
 
   const displayName =
     profile?.display_name ||
@@ -16,11 +18,18 @@ export default function Header() {
   const displayEmail = profile?.email || user?.email || '';
 
   return (
-    <header className="fixed left-64 right-0 top-0 z-30 h-16 border-b border-gray-200 bg-white px-6">
+    <header className="fixed left-0 md:left-64 right-0 top-0 z-30 h-16 border-b border-gray-200 bg-white px-4 md:px-6">
       <div className="flex h-full items-center justify-between">
-        {/* Search */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
+        {/* 모바일 햄버거 + 검색 */}
+        <div className="flex items-center gap-3 flex-1 max-w-md">
+          <button
+            onClick={toggleMenu}
+            className="md:hidden rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+            aria-label="메뉴 열기"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="relative flex-1 hidden sm:block">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -31,8 +40,7 @@ export default function Header() {
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center gap-3">
-          {/* 다크모드 토글 */}
+        <div className="flex items-center gap-2 md:gap-3">
           <button
             onClick={toggle}
             title={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
@@ -41,14 +49,13 @@ export default function Header() {
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
 
-          {/* 알림 (실제 알림 없으면 빨간 점 미표시) */}
           <button className="relative rounded-full p-2 hover:bg-gray-100">
             <Bell className="h-5 w-5 text-gray-600" />
           </button>
 
-          <div className="text-sm">
+          <div className="text-sm hidden sm:block">
             <p className="font-medium text-gray-900">{displayName}</p>
-            <p className="text-gray-500">{displayEmail}</p>
+            <p className="text-gray-500 text-xs">{displayEmail}</p>
           </div>
           <button
             onClick={signOut}

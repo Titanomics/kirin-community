@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { MobileMenuProvider } from "@/contexts/MobileMenuContext";
 
 export default function MainLayout({
   children,
@@ -9,13 +10,15 @@ export default function MainLayout({
 }) {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-gray-50">
-        <Sidebar />
-        <div className="ml-64">
-          <Header />
-          <main className="mt-16 p-6">{children}</main>
+      <MobileMenuProvider>
+        <div className="min-h-screen bg-gray-50">
+          <Sidebar />
+          <div className="md:ml-64">
+            <Header />
+            <main className="mt-16 p-4 md:p-6">{children}</main>
+          </div>
         </div>
-      </div>
+      </MobileMenuProvider>
     </AuthProvider>
   );
 }

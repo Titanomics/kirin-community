@@ -153,35 +153,31 @@ export default function MyLeavePage() {
       {/* Balance Card */}
       {balance ? (
         <div className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white shadow-lg">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-100">잔여 {balance.kind}</p>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-5xl font-bold">{balance.remaining}</span>
-                <span className="text-xl text-blue-200">/ {balance.total}개</span>
-              </div>
-              <p className="mt-2 text-sm text-blue-100">{balance.note}</p>
-              {balance.adjustment !== 0 && (
-                <p className="mt-0.5 text-xs text-blue-200">
-                  관리자 조정: {balance.adjustment > 0 ? '+' : ''}{balance.adjustment}일 적용됨
-                </p>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-blue-100">사용</p>
-              <p className="text-2xl font-semibold">{balance.used}개</p>
-            </div>
+          <p className="text-sm font-medium text-blue-100">잔여 {balance.kind}</p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-5xl font-bold">{balance.remaining}</span>
+            <span className="text-xl text-blue-200">개</span>
           </div>
+          <p className="mt-1.5 text-sm text-blue-200">
+            총 {balance.total}개 부여
+            {(balance.total - balance.remaining) > 0 && ` · 사용 ${balance.total - balance.remaining}개`}
+          </p>
+          <p className="mt-2 text-sm text-blue-100">{balance.note}</p>
+          {balance.adjustment !== 0 && (
+            <p className="mt-0.5 text-xs text-blue-200">
+              관리자 조정: {balance.adjustment > 0 ? '+' : ''}{balance.adjustment}일 적용됨
+            </p>
+          )}
           {balance.total > 0 && (
             <div className="mt-4">
               <div className="h-2 w-full overflow-hidden rounded-full bg-blue-500/50">
                 <div
                   className="h-full rounded-full bg-white transition-all"
-                  style={{ width: `${Math.round((balance.remaining / balance.total) * 100)}%` }}
+                  style={{ width: `${Math.min(100, Math.round((balance.remaining / balance.total) * 100))}%` }}
                 />
               </div>
               <p className="mt-1 text-right text-xs text-blue-200">
-                {Math.round((balance.remaining / balance.total) * 100)}% 남음
+                {Math.min(100, Math.round((balance.remaining / balance.total) * 100))}% 남음
               </p>
             </div>
           )}

@@ -45,7 +45,7 @@ export default function Home() {
   async function fetchData() {
     try {
       const [profilesRes, pendingRes, approvedRes] = await Promise.all([
-        supabase.from('profiles').select('*'),
+        supabase.from('profiles').select('*').is('resigned_at', null),
         supabase
           .from('leave_requests')
           .select('*, profiles!leave_requests_user_id_fkey(display_name, email)')

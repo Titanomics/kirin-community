@@ -61,7 +61,7 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ joined_at: '', birthday: '', team: '', role: '', leave_adjustment: '0' });
+  const [editForm, setEditForm] = useState({ joined_at: '', birthday: '', team: '', role: '', leave_remaining: '' });
   const [saving, setSaving] = useState(false);
   const [showResigned, setShowResigned] = useState(false);
 
@@ -129,12 +129,13 @@ export default function EmployeesPage() {
 
   function startEdit(p: Profile) {
     setEditingId(p.id);
+    const currentBalance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_adjustment ?? 0);
     setEditForm({
       joined_at: p.joined_at || '',
       birthday: p.birthday || '',
       team: p.team || '',
       role: p.role,
-      leave_adjustment: String(p.leave_adjustment ?? 0),
+      leave_remaining: currentBalance ? String(currentBalance.remaining) : '',
     });
   }
 
@@ -162,12 +163,17 @@ export default function EmployeesPage() {
 
   async function handleSave(id: string) {
     setSaving(true);
+    const baseBalance = calcLeaveBalance(editForm.joined_at, leavesByUser[id] || [], 0);
+    const baseRemaining = baseBalance?.remaining ?? 0;
+    const targetRemaining = parseFloat(editForm.leave_remaining);
+    const newAdjustment = isNaN(targetRemaining) ? 0 : targetRemaining - baseRemaining;
+
     const updateData: Record<string, string | number | null> = {
       joined_at: editForm.joined_at || null,
       birthday: editForm.birthday || null,
       team: editForm.team || null,
       role: editForm.role,
-      leave_adjustment: parseFloat(editForm.leave_adjustment) || 0,
+      leave_adjustment: newAdjustment,
     };
 
     const { error } = await supabase
@@ -366,18 +372,23 @@ export default function EmployeesPage() {
                       {editingId === p.id ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-xs text-gray-500">
-                            자동계산: {balance ? `${Math.max(0, balance.remaining - (parseFloat(editForm.leave_adjustment) || 0))}개` : '-'}
+                            자동계산: {(() => {
+                              const base = calcLeaveBalance(editForm.joined_at, leavesByUser[p.id] || [], 0);
+                              return base ? `${base.remaining}개 (${base.kind})` : '-';
+                            })()}
                           </span>
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500">조정</span>
+                            <span className="text-xs text-gray-500">잔여</span>
                             <input
                               type="number"
-                              value={editForm.leave_adjustment}
-                              onChange={(e) => setEditForm({ ...editForm, leave_adjustment: e.target.value })}
+                              value={editForm.leave_remaining}
+                              onChange={(e) => setEditForm({ ...editForm, leave_remaining: e.target.value })}
                               className="w-16 rounded border border-gray-300 px-2 py-1 text-sm text-center"
+                              step="0.5"
+                              min="0"
                               placeholder="0"
                             />
-                            <span className="text-xs text-gray-400">일</span>
+                            <span className="text-xs text-gray-400">개</span>
                           </div>
                         </div>
                       ) : balance ? (
