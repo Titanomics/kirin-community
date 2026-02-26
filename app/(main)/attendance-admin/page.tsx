@@ -80,7 +80,7 @@ export default function AttendanceAdminPage() {
     const monthEnd = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
     const [profilesRes, monthRes, todayRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name, email, team').is('resigned_at', null).order('display_name'),
+      supabase.from('profiles').select('id, display_name, email, team').is('resigned_at', null).neq('role', 'admin').order('display_name'),
       supabase.from('attendance').select('*').gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false }),
       supabase.from('attendance').select('*').eq('date', today),
     ]);
@@ -94,7 +94,7 @@ export default function AttendanceAdminPage() {
     else setLoading(false);
   }, [isAdmin, fetchData]);
 
-  async function handleSaveEdit(id: string, date: string) {
+  async function handleSaveEdit(id: string) {
     setSaving(true);
     const { error } = await supabase
       .from('attendance')
@@ -183,7 +183,6 @@ export default function AttendanceAdminPage() {
   const checkedIn = profiles.filter((p) => todayMap[p.id]?.check_in && !todayMap[p.id]?.check_out).length;
   const checkedOut = profiles.filter((p) => todayMap[p.id]?.check_out).length;
   const absent = profiles.filter((p) => !todayMap[p.id]?.check_in).length;
-  const profileMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
 
   // 일자별 record 맵: { date: { userId: record } }
   const recordMatrix: Record<string, Record<string, AttendanceRecord>> = {};
@@ -384,7 +383,7 @@ export default function AttendanceAdminPage() {
                                     <input type="text" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
                                       placeholder="메모" className="rounded border border-gray-300 px-2 py-0.5 text-xs w-16" />
                                   </div>
-                                  <button onClick={() => handleSaveEdit(r.id, r.date)} disabled={saving} className="rounded bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
+                                  <button onClick={() => handleSaveEdit(r.id)} disabled={saving} className="rounded bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
                                     <Save className="h-3.5 w-3.5" />
                                   </button>
                                   <button onClick={() => setEditingId(null)} className="rounded bg-gray-200 p-1.5 text-gray-600 hover:bg-gray-300">
@@ -491,7 +490,7 @@ export default function AttendanceAdminPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
-                              <button onClick={() => handleSaveEdit(r.id, r.date)} disabled={saving} className="rounded bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
+                              <button onClick={() => handleSaveEdit(r.id)} disabled={saving} className="rounded bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50">
                                 <Save className="h-3.5 w-3.5" />
                               </button>
                               <button onClick={() => setEditingId(null)} className="rounded bg-gray-200 p-1.5 text-gray-600 hover:bg-gray-300">
