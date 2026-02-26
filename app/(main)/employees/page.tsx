@@ -34,7 +34,11 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
 
   if (years < 1) {
     const total = Math.min(totalMonths, 11);
-    const used = approvedLeaves.filter((l) => l.leave_type === '월차').length;
+    const used = approvedLeaves.reduce((sum, l) => {
+      if (l.leave_type === '월차') return sum + 1;
+      if (l.leave_type === '반차') return sum + 0.5;
+      return sum;
+    }, 0);
     const remaining = Math.max(0, total - used) + adjustment;
     return { kind: '월차' as const, total, used, remaining, adjustment };
   } else {
