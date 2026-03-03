@@ -139,7 +139,7 @@ export default function EmployeesPage() {
       birthday: p.birthday || '',
       team: p.team || '',
       role: p.role,
-      leave_remaining: currentBalance ? String(currentBalance.remaining) : '',
+      leave_remaining: currentBalance ? String(currentBalance.total) : '',
     });
   }
 
@@ -167,12 +167,8 @@ export default function EmployeesPage() {
 
   async function handleSave(id: string) {
     setSaving(true);
-    const used = (leavesByUser[id] || []).reduce((sum, l) => {
-      if (l.leave_type === '반차') return sum + 0.5;
-      return sum + countBusinessDays(l.start_date, l.end_date);
-    }, 0);
-    const targetRemaining = parseFloat(editForm.leave_remaining);
-    const totalOverride = isNaN(targetRemaining) ? null : targetRemaining + used;
+    const targetTotal = parseFloat(editForm.leave_remaining);
+    const totalOverride = isNaN(targetTotal) ? null : targetTotal;
 
     const updateData: Record<string, string | number | null> = {
       joined_at: editForm.joined_at || null,
@@ -197,12 +193,8 @@ export default function EmployeesPage() {
   }
 
   async function handleLeaveSave(id: string) {
-    const used = (leavesByUser[id] || []).reduce((sum, l) => {
-      if (l.leave_type === '반차') return sum + 0.5;
-      return sum + countBusinessDays(l.start_date, l.end_date);
-    }, 0);
     const target = parseFloat(leaveEditValue);
-    const totalOverride = isNaN(target) ? null : target + used;
+    const totalOverride = isNaN(target) ? null : target;
     const { error } = await supabase.from('profiles').update({ leave_total_override: totalOverride }).eq('id', id);
     if (error) { alert('저장 실패: ' + error.message); return; }
     await fetchProfiles();
@@ -393,11 +385,11 @@ export default function EmployeesPage() {
                           <span className="text-xs text-gray-400">
                             자동: {(() => {
                               const base = calcLeaveBalance(editForm.joined_at, leavesByUser[p.id] || [], null);
-                              return base ? `잔여 ${base.remaining}개 (${base.kind})` : '-';
+                              return base ? `총 ${base.autoTotal}개 (${base.kind})` : '-';
                             })()}
                           </span>
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500">잔여</span>
+                            <span className="text-xs text-gray-500">총</span>
                             <input
                               type="number"
                               value={editForm.leave_remaining}
@@ -411,19 +403,30 @@ export default function EmployeesPage() {
                           </div>
                         </div>
                       ) : leaveEditingId === p.id ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            value={leaveEditValue}
-                            onChange={(e) => setLeaveEditValue(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleLeaveSave(p.id); if (e.key === 'Escape') setLeaveEditingId(null); }}
-                            autoFocus
-                            className="w-16 rounded border border-blue-400 px-2 py-1 text-sm text-center focus:outline-none"
-                            step="0.5"
-                            min="0"
-                          />
-                          <button onClick={() => handleLeaveSave(p.id)} className="rounded bg-blue-600 p-1 text-white hover:bg-blue-700"><Save className="h-3 w-3" /></button>
-                          <button onClick={() => setLeaveEditingId(null)} className="rounded bg-gray-200 p-1 text-gray-600 hover:bg-gray-300"><X className="h-3 w-3" /></button>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">총</span>
+                            <input
+                              type="number"
+                              value={leaveEditValue}
+                              onChange={(e) => setLeaveEditValue(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleLeaveSave(p.id); if (e.key === 'Escape') setLeaveEditingId(null); }}
+                              autoFocus
+                              className="w-16 rounded border border-blue-400 px-2 py-1 text-sm text-center focus:outline-none"
+                              step="0.5"
+                              min="0"
+                            />
+                            <span className="text-xs text-gray-400">개</span>
+                            <button onClick={() => handleLeaveSave(p.id)} className="rounded bg-blue-600 p-1 text-white hover:bg-blue-700"><Save className="h-3 w-3" /></button>
+                            <button onClick={() => setLeaveEditingId(null)} className="rounded bg-gray-200 p-1 text-gray-600 hover:bg-gray-300"><X className="h-3 w-3" /></button>
+                          </div>
+                          <span className="text-xs text-gray-400">
+                            잔여: {(() => {
+                              const used = (leavesByUser[p.id] || []).reduce((s, l) => s + (l.leave_type === '반차' ? 0.5 : countBusinessDays(l.start_date, l.end_date)), 0);
+                              const total = parseFloat(leaveEditValue);
+                              return isNaN(total) ? '-' : `${Math.max(0, total - used)}개`;
+                            })()}
+                          </span>
                         </div>
                       ) : balance ? (
                         <div className="flex items-center gap-1.5">
@@ -432,7 +435,7 @@ export default function EmployeesPage() {
                           <span className="text-xs text-gray-500">{balance.kind}</span>
                           {isAdmin && !p.resigned_at && (
                             <button
-                              onClick={() => { setLeaveEditingId(p.id); setLeaveEditValue(String(balance.remaining)); }}
+                              onClick={() => { setLeaveEditingId(p.id); setLeaveEditValue(String(balance.total)); }}
                               className="ml-1 text-gray-300 hover:text-blue-500"
                               title="잔여 수정"
                             >
