@@ -33,7 +33,7 @@ function countBusinessDays(start: string, end: string): number {
   return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
 }
 
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], totalOverride: number | null = null) {
+function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
   if (!joinedAt) return null;
   const today = new Date();
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
@@ -45,13 +45,13 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
   }, 0);
 
   if (years < 1) {
-    const autoTotal = Math.min(totalMonths, 11);
-    const total = totalOverride ?? autoTotal;
-    return { kind: '월차' as const, total, autoTotal, used, remaining: Math.max(0, total - used), isOverride: totalOverride !== null };
+    const autoTotal = Math.min(totalMonths, 12);
+    const total = autoTotal + adjustment;
+    return { kind: '월차' as const, total, autoTotal, used, remaining: Math.max(0, total - used) };
   } else {
     const autoTotal = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
-    const total = totalOverride ?? autoTotal;
-    return { kind: '연차' as const, total, autoTotal, used, remaining: Math.max(0, total - used), isOverride: totalOverride !== null };
+    const total = autoTotal + adjustment;
+    return { kind: '연차' as const, total, autoTotal, used, remaining: Math.max(0, total - used) };
   }
 }
 
@@ -134,7 +134,7 @@ export default function EmployeesPage() {
 
   function startEdit(p: Profile) {
     setEditingId(p.id);
-    const currentBalance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? null);
+    const currentBalance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? 0);
     setEditForm({
       joined_at: p.joined_at || '',
       birthday: p.birthday || '',
@@ -169,14 +169,15 @@ export default function EmployeesPage() {
   async function handleSave(id: string) {
     setSaving(true);
     const targetTotal = parseFloat(editForm.leave_remaining);
-    const totalOverride = isNaN(targetTotal) ? null : targetTotal;
+    const autoBalance = calcLeaveBalance(editForm.joined_at, [], 0);
+    const adjustment = isNaN(targetTotal) || !autoBalance ? null : targetTotal - autoBalance.autoTotal;
 
     const updateData: Record<string, string | number | null> = {
       joined_at: editForm.joined_at || null,
       birthday: editForm.birthday || null,
       team: editForm.team || null,
       role: editForm.role,
-      leave_total_override: totalOverride,
+      leave_total_override: adjustment,
     };
 
     const { error } = await supabase
@@ -196,14 +197,18 @@ export default function EmployeesPage() {
   async function handleLeaveSave(id: string) {
     const target = parseFloat(leaveEditValue);
     if (isNaN(target)) { setLeaveEditingId(null); return; }
-    let totalOverride: number;
+    const profile = profiles.find((pr) => pr.id === id);
+    const autoBalance = calcLeaveBalance(profile?.joined_at ?? null, [], 0);
+    if (!autoBalance) { setLeaveEditingId(null); return; }
+    let newTotal: number;
     if (leaveEditField === 'remaining') {
       const used = (leavesByUser[id] || []).reduce((s, l) => s + (l.leave_type === '반차' ? 0.5 : countBusinessDays(l.start_date, l.end_date)), 0);
-      totalOverride = target + used;
+      newTotal = target + used;
     } else {
-      totalOverride = target;
+      newTotal = target;
     }
-    const { error } = await supabase.from('profiles').update({ leave_total_override: totalOverride }).eq('id', id);
+    const adjustment = newTotal - autoBalance.autoTotal;
+    const { error } = await supabase.from('profiles').update({ leave_total_override: adjustment }).eq('id', id);
     if (error) { alert('저장 실패: ' + error.message); return; }
     await fetchProfiles();
     setLeaveEditingId(null);
@@ -212,7 +217,7 @@ export default function EmployeesPage() {
   const exportCSV = () => {
     const headers = ['이름', '이메일', '역할', '팀', '입사일', '근속기간', '생일', '잔여연차/월차'];
     const data = profiles.map((p) => {
-      const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? null);
+      const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? 0);
       const balanceStr = balance ? `${balance.kind} ${balance.remaining}/${balance.total}` : '-';
       return [
         p.display_name || '-',
@@ -304,7 +309,7 @@ export default function EmployeesPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {filteredProfiles.map((p) => {
-                const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? null);
+                const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? 0);
                 const balanceColor =
                   !balance
                     ? 'text-gray-400'
@@ -392,7 +397,7 @@ export default function EmployeesPage() {
                         <div className="flex flex-col gap-1">
                           <span className="text-xs text-gray-400">
                             자동: {(() => {
-                              const base = calcLeaveBalance(editForm.joined_at, leavesByUser[p.id] || [], null);
+                              const base = calcLeaveBalance(editForm.joined_at, leavesByUser[p.id] || [], 0);
                               return base ? `총 ${base.autoTotal}개 (${base.kind})` : '-';
                             })()}
                           </span>

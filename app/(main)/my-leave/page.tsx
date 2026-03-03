@@ -21,7 +21,7 @@ function countBusinessDays(start: string, end: string): number {
   return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
 }
 
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], totalOverride: number | null = null) {
+function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
   if (!joinedAt) return null;
   const today = new Date();
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
@@ -33,18 +33,18 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
   }, 0);
 
   if (years < 1) {
-    const autoTotal = Math.min(totalMonths, 11);
-    const total = totalOverride ?? autoTotal;
+    const autoTotal = Math.min(totalMonths, 12);
+    const total = autoTotal + adjustment;
     return {
       kind: '월차' as const,
       total,
       used,
       remaining: Math.max(0, total - used),
-      note: `입사 후 ${totalMonths}개월 경과 · 매월 1개 자동 부여 (최대 11개)`,
+      note: `입사 후 ${totalMonths}개월 경과 · 매월 1개 자동 부여 (최대 12개)`,
     };
   } else {
     const autoTotal = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
-    const total = totalOverride ?? autoTotal;
+    const total = autoTotal + adjustment;
     return {
       kind: '연차' as const,
       total,
@@ -130,7 +130,7 @@ export default function MyLeavePage() {
 
   const approvedLeaves = leaves.filter((l) => l.status === '승인');
   const pendingCount = leaves.filter((l) => l.status === '대기').length;
-  const balance = calcLeaveBalance(profile?.joined_at ?? null, approvedLeaves, profile?.leave_total_override ?? null);
+  const balance = calcLeaveBalance(profile?.joined_at ?? null, approvedLeaves, profile?.leave_total_override ?? 0);
 
   return (
     <div className="space-y-6">
