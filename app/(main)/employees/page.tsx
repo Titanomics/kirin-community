@@ -65,6 +65,8 @@ export default function EmployeesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ joined_at: '', birthday: '', team: '', role: '', leave_remaining: '' });
   const [saving, setSaving] = useState(false);
+  const [leaveEditingId, setLeaveEditingId] = useState<string | null>(null);
+  const [leaveEditValue, setLeaveEditValue] = useState('');
   const [showResigned, setShowResigned] = useState(false);
 
   const isAdmin = myProfile?.role === 'admin';
@@ -192,6 +194,19 @@ export default function EmployeesPage() {
       setEditingId(null);
     }
     setSaving(false);
+  }
+
+  async function handleLeaveSave(id: string) {
+    const used = (leavesByUser[id] || []).reduce((sum, l) => {
+      if (l.leave_type === '반차') return sum + 0.5;
+      return sum + countBusinessDays(l.start_date, l.end_date);
+    }, 0);
+    const target = parseFloat(leaveEditValue);
+    const totalOverride = isNaN(target) ? null : target + used;
+    const { error } = await supabase.from('profiles').update({ leave_total_override: totalOverride }).eq('id', id);
+    if (error) { alert('저장 실패: ' + error.message); return; }
+    await fetchProfiles();
+    setLeaveEditingId(null);
   }
 
   const exportCSV = () => {
@@ -395,13 +410,35 @@ export default function EmployeesPage() {
                             <span className="text-xs text-gray-400">개</span>
                           </div>
                         </div>
+                      ) : leaveEditingId === p.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={leaveEditValue}
+                            onChange={(e) => setLeaveEditValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleLeaveSave(p.id); if (e.key === 'Escape') setLeaveEditingId(null); }}
+                            autoFocus
+                            className="w-16 rounded border border-blue-400 px-2 py-1 text-sm text-center focus:outline-none"
+                            step="0.5"
+                            min="0"
+                          />
+                          <button onClick={() => handleLeaveSave(p.id)} className="rounded bg-blue-600 p-1 text-white hover:bg-blue-700"><Save className="h-3 w-3" /></button>
+                          <button onClick={() => setLeaveEditingId(null)} className="rounded bg-gray-200 p-1 text-gray-600 hover:bg-gray-300"><X className="h-3 w-3" /></button>
+                        </div>
                       ) : balance ? (
-                        <div>
-                          <span className={`font-semibold ${balanceColor}`}>
-                            {balance.remaining}
-                          </span>
-                          <span className="text-gray-400"> / {balance.total}</span>
-                          <span className="ml-1 text-xs text-gray-500">{balance.kind}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-semibold ${balanceColor}`}>{balance.remaining}</span>
+                          <span className="text-gray-400">/ {balance.total}</span>
+                          <span className="text-xs text-gray-500">{balance.kind}</span>
+                          {isAdmin && !p.resigned_at && (
+                            <button
+                              onClick={() => { setLeaveEditingId(p.id); setLeaveEditValue(String(balance.remaining)); }}
+                              className="ml-1 text-gray-300 hover:text-blue-500"
+                              title="잔여 수정"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <span className="text-gray-400">-</span>
