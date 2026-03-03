@@ -10,7 +10,7 @@ interface UserProfile {
   display_name: string | null;
   role: 'admin' | 'user' | 'leader';
   joined_at: string | null;
-  leave_adjustment: number;
+  leave_total_override: number | null;
   resigned_at: string | null;
 }
 

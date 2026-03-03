@@ -21,39 +21,36 @@ function countBusinessDays(start: string, end: string): number {
   return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
 }
 
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
+function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], totalOverride: number | null = null) {
   if (!joinedAt) return null;
   const today = new Date();
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
   const years = Math.floor(totalMonths / 12);
 
-  // 반차 = 0.5일, 그 외는 시작일~종료일 평일 수 계산
   const used = approvedLeaves.reduce((sum, l) => {
     if (l.leave_type === '반차') return sum + 0.5;
     return sum + countBusinessDays(l.start_date, l.end_date);
   }, 0);
 
   if (years < 1) {
-    const total = Math.min(totalMonths, 11);
-    const remaining = Math.max(0, total - used) + adjustment;
+    const autoTotal = Math.min(totalMonths, 11);
+    const total = totalOverride ?? autoTotal;
     return {
       kind: '월차' as const,
       total,
       used,
-      remaining,
-      adjustment,
+      remaining: Math.max(0, total - used),
       note: `입사 후 ${totalMonths}개월 경과 · 매월 1개 자동 부여 (최대 11개)`,
     };
   } else {
-    const total = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
-    const remaining = Math.max(0, total - used) + adjustment;
+    const autoTotal = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
+    const total = totalOverride ?? autoTotal;
     return {
       kind: '연차' as const,
       total,
       used,
-      remaining,
-      adjustment,
-      note: `근속 ${years}년 · 기본 15일 + 추가 ${total - 15}일`,
+      remaining: Math.max(0, total - used),
+      note: `근속 ${years}년 · 기본 15일 + 추가 ${autoTotal - 15}일`,
     };
   }
 }
@@ -133,7 +130,7 @@ export default function MyLeavePage() {
 
   const approvedLeaves = leaves.filter((l) => l.status === '승인');
   const pendingCount = leaves.filter((l) => l.status === '대기').length;
-  const balance = calcLeaveBalance(profile?.joined_at ?? null, approvedLeaves, profile?.leave_adjustment ?? 0);
+  const balance = calcLeaveBalance(profile?.joined_at ?? null, approvedLeaves, profile?.leave_total_override ?? null);
 
   return (
     <div className="space-y-6">
@@ -164,11 +161,6 @@ export default function MyLeavePage() {
             {(balance.total - balance.remaining) > 0 && ` · 사용 ${balance.total - balance.remaining}개`}
           </p>
           <p className="mt-2 text-sm text-blue-100">{balance.note}</p>
-          {balance.adjustment !== 0 && (
-            <p className="mt-0.5 text-xs text-blue-200">
-              관리자 조정: {balance.adjustment > 0 ? '+' : ''}{balance.adjustment}일 적용됨
-            </p>
-          )}
           {balance.total > 0 && (
             <div className="mt-4">
               <div className="h-2 w-full overflow-hidden rounded-full bg-blue-500/50">

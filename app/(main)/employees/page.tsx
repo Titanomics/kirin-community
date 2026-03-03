@@ -15,7 +15,7 @@ interface Profile {
   joined_at: string | null;
   birthday: string | null;
   created_at: string;
-  leave_adjustment: number;
+  leave_total_override: number | null;
   resigned_at: string | null;
 }
 
@@ -33,26 +33,25 @@ function countBusinessDays(start: string, end: string): number {
   return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
 }
 
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
+function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], totalOverride: number | null = null) {
   if (!joinedAt) return null;
   const today = new Date();
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
   const years = Math.floor(totalMonths / 12);
 
-  // 반차 = 0.5일, 그 외는 시작일~종료일 평일 수 계산
   const used = approvedLeaves.reduce((sum, l) => {
     if (l.leave_type === '반차') return sum + 0.5;
     return sum + countBusinessDays(l.start_date, l.end_date);
   }, 0);
 
   if (years < 1) {
-    const total = Math.min(totalMonths, 11);
-    const remaining = Math.max(0, total - used) + adjustment;
-    return { kind: '월차' as const, total, used, remaining, adjustment };
+    const autoTotal = Math.min(totalMonths, 11);
+    const total = totalOverride ?? autoTotal;
+    return { kind: '월차' as const, total, autoTotal, used, remaining: Math.max(0, total - used), isOverride: totalOverride !== null };
   } else {
-    const total = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
-    const remaining = Math.max(0, total - used) + adjustment;
-    return { kind: '연차' as const, total, used, remaining, adjustment };
+    const autoTotal = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
+    const total = totalOverride ?? autoTotal;
+    return { kind: '연차' as const, total, autoTotal, used, remaining: Math.max(0, total - used), isOverride: totalOverride !== null };
   }
 }
 
@@ -132,7 +131,7 @@ export default function EmployeesPage() {
 
   function startEdit(p: Profile) {
     setEditingId(p.id);
-    const currentBalance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_adjustment ?? 0);
+    const currentBalance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? null);
     setEditForm({
       joined_at: p.joined_at || '',
       birthday: p.birthday || '',
@@ -166,17 +165,19 @@ export default function EmployeesPage() {
 
   async function handleSave(id: string) {
     setSaving(true);
-    const baseBalance = calcLeaveBalance(editForm.joined_at, leavesByUser[id] || [], 0);
-    const baseRemaining = baseBalance?.remaining ?? 0;
+    const used = (leavesByUser[id] || []).reduce((sum, l) => {
+      if (l.leave_type === '반차') return sum + 0.5;
+      return sum + countBusinessDays(l.start_date, l.end_date);
+    }, 0);
     const targetRemaining = parseFloat(editForm.leave_remaining);
-    const newAdjustment = isNaN(targetRemaining) ? 0 : targetRemaining - baseRemaining;
+    const totalOverride = isNaN(targetRemaining) ? null : targetRemaining + used;
 
     const updateData: Record<string, string | number | null> = {
       joined_at: editForm.joined_at || null,
       birthday: editForm.birthday || null,
       team: editForm.team || null,
       role: editForm.role,
-      leave_adjustment: newAdjustment,
+      leave_total_override: totalOverride,
     };
 
     const { error } = await supabase
@@ -196,7 +197,7 @@ export default function EmployeesPage() {
   const exportCSV = () => {
     const headers = ['이름', '이메일', '역할', '팀', '입사일', '근속기간', '생일', '잔여연차/월차'];
     const data = profiles.map((p) => {
-      const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_adjustment ?? 0);
+      const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? null);
       const balanceStr = balance ? `${balance.kind} ${balance.remaining}/${balance.total}` : '-';
       return [
         p.display_name || '-',
@@ -288,7 +289,7 @@ export default function EmployeesPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {filteredProfiles.map((p) => {
-                const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_adjustment ?? 0);
+                const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? null);
                 const balanceColor =
                   !balance
                     ? 'text-gray-400'
@@ -374,10 +375,10 @@ export default function EmployeesPage() {
                     <td className="whitespace-nowrap px-6 py-4 text-sm">
                       {editingId === p.id ? (
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-gray-500">
-                            자동계산: {(() => {
-                              const base = calcLeaveBalance(editForm.joined_at, leavesByUser[p.id] || [], 0);
-                              return base ? `${base.remaining}개 (${base.kind})` : '-';
+                          <span className="text-xs text-gray-400">
+                            자동: {(() => {
+                              const base = calcLeaveBalance(editForm.joined_at, leavesByUser[p.id] || [], null);
+                              return base ? `잔여 ${base.remaining}개 (${base.kind})` : '-';
                             })()}
                           </span>
                           <div className="flex items-center gap-1">
@@ -389,7 +390,7 @@ export default function EmployeesPage() {
                               className="w-16 rounded border border-gray-300 px-2 py-1 text-sm text-center"
                               step="0.5"
                               min="0"
-                              placeholder="0"
+                              placeholder="자동"
                             />
                             <span className="text-xs text-gray-400">개</span>
                           </div>
@@ -401,11 +402,6 @@ export default function EmployeesPage() {
                           </span>
                           <span className="text-gray-400"> / {balance.total}</span>
                           <span className="ml-1 text-xs text-gray-500">{balance.kind}</span>
-                          {balance.adjustment !== 0 && (
-                            <span className={`ml-1 text-xs ${balance.adjustment > 0 ? 'text-blue-500' : 'text-red-400'}`}>
-                              ({balance.adjustment > 0 ? '+' : ''}{balance.adjustment})
-                            </span>
-                          )}
                         </div>
                       ) : (
                         <span className="text-gray-400">-</span>
