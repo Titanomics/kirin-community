@@ -22,13 +22,11 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
   const years = Math.floor(totalMonths / 12);
 
+  // 반차 = 0.5일, 나머지 (월차·연차) = 1일로 통일 카운트
+  const used = approvedLeaves.reduce((sum, l) => sum + (l.leave_type === '반차' ? 0.5 : 1), 0);
+
   if (years < 1) {
     const total = Math.min(totalMonths, 11);
-    const used = approvedLeaves.reduce((sum, l) => {
-      if (l.leave_type === '월차') return sum + 1;
-      if (l.leave_type === '반차') return sum + 0.5;
-      return sum;
-    }, 0);
     const remaining = Math.max(0, total - used) + adjustment;
     return {
       kind: '월차' as const,
@@ -40,11 +38,6 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
     };
   } else {
     const total = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
-    const used = approvedLeaves.reduce((sum, l) => {
-      if (l.leave_type === '연차') return sum + 1;
-      if (l.leave_type === '반차') return sum + 0.5;
-      return sum;
-    }, 0);
     const remaining = Math.max(0, total - used) + adjustment;
     return {
       kind: '연차' as const,
