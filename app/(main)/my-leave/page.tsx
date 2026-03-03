@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { CalendarDays, Clock, CheckCircle, XCircle, Plus, X } from 'lucide-react';
-import { differenceInMonths } from 'date-fns';
+import { differenceInMonths, eachDayOfInterval } from 'date-fns';
 
 interface LeaveRequest {
   id: string;
@@ -16,14 +16,22 @@ interface LeaveRequest {
   created_at: string;
 }
 
+function countBusinessDays(start: string, end: string): number {
+  const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) });
+  return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
+}
+
 function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
   if (!joinedAt) return null;
   const today = new Date();
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
   const years = Math.floor(totalMonths / 12);
 
-  // 반차 = 0.5일, 나머지 (월차·연차) = 1일로 통일 카운트
-  const used = approvedLeaves.reduce((sum, l) => sum + (l.leave_type === '반차' ? 0.5 : 1), 0);
+  // 반차 = 0.5일, 그 외는 시작일~종료일 평일 수 계산
+  const used = approvedLeaves.reduce((sum, l) => {
+    if (l.leave_type === '반차') return sum + 0.5;
+    return sum + countBusinessDays(l.start_date, l.end_date);
+  }, 0);
 
   if (years < 1) {
     const total = Math.min(totalMonths, 11);

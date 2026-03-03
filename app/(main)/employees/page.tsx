@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { Edit, Search, Download, Save, X, UserX } from 'lucide-react';
-import { format, differenceInMonths } from 'date-fns';
+import { format, differenceInMonths, eachDayOfInterval } from 'date-fns';
 
 interface Profile {
   id: string;
@@ -24,6 +24,13 @@ interface LeaveRequest {
   user_id: string;
   leave_type: '연차' | '반차' | '월차';
   status: '대기' | '승인' | '반려';
+  start_date: string;
+  end_date: string;
+}
+
+function countBusinessDays(start: string, end: string): number {
+  const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) });
+  return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
 }
 
 function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
@@ -32,8 +39,11 @@ function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[
   const totalMonths = differenceInMonths(today, new Date(joinedAt));
   const years = Math.floor(totalMonths / 12);
 
-  // 반차 = 0.5일, 나머지 (월차·연차) = 1일로 통일 카운트
-  const used = approvedLeaves.reduce((sum, l) => sum + (l.leave_type === '반차' ? 0.5 : 1), 0);
+  // 반차 = 0.5일, 그 외는 시작일~종료일 평일 수 계산
+  const used = approvedLeaves.reduce((sum, l) => {
+    if (l.leave_type === '반차') return sum + 0.5;
+    return sum + countBusinessDays(l.start_date, l.end_date);
+  }, 0);
 
   if (years < 1) {
     const total = Math.min(totalMonths, 11);
@@ -68,7 +78,7 @@ export default function EmployeesPage() {
     try {
       const [{ data: profilesData }, { data: leavesData }] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: true }),
-        supabase.from('leave_requests').select('id, user_id, leave_type, status').eq('status', '승인'),
+        supabase.from('leave_requests').select('id, user_id, leave_type, status, start_date, end_date').eq('status', '승인'),
       ]);
       setProfiles(profilesData || []);
 
