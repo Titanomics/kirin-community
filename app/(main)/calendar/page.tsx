@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle, XCircle, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle, XCircle, X, Pencil } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { createClient } from '@/lib/supabase/client';
@@ -18,6 +18,16 @@ interface CalendarLeave {
   profiles: { display_name: string | null; email: string | null } | null;
 }
 
+interface CalendarSchedule {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  date: string;
+  created_at: string;
+  profiles: { display_name: string | null; email: string | null } | null;
+}
+
 interface DayEvent {
   id: string;
   user_id: string;
@@ -27,6 +37,9 @@ interface DayEvent {
   reason: string | null;
   start_date: string;
   end_date: string;
+  eventKind: 'leave' | 'schedule';
+  title?: string;
+  description?: string | null;
 }
 
 interface Profile {
@@ -42,6 +55,7 @@ export default function CalendarPage() {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [leaves, setLeaves] = useState<CalendarLeave[]>([]);
+  const [schedules, setSchedules] = useState<CalendarSchedule[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,7 +65,7 @@ export default function CalendarPage() {
   const [selectedDateLabel, setSelectedDateLabel] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
 
-  // 추가/수정 모달
+  // 휴가 추가/수정 모달
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -64,12 +78,23 @@ export default function CalendarPage() {
   });
   const [saving, setSaving] = useState(false);
 
+  // 일정 추가/수정 모달
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({ title: '', description: '', date: '' });
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   useEffect(() => {
-    fetchLeaves();
+    async function load() {
+      setLoading(true);
+      await Promise.all([fetchLeaves(), fetchSchedules()]);
+      setLoading(false);
+    }
+    load();
   }, [currentDate]);
 
   useEffect(() => {
@@ -98,14 +123,27 @@ export default function CalendarPage() {
       setLeaves(data || []);
     } catch (err) {
       console.error('캘린더 데이터 로딩 실패:', err);
-    } finally {
-      setLoading(false);
+    }
+  }
+
+  async function fetchSchedules() {
+    const start = format(monthStart, 'yyyy-MM-dd');
+    const end = format(monthEnd, 'yyyy-MM-dd');
+    try {
+      const { data } = await supabase
+        .from('schedules')
+        .select('*, profiles(display_name, email)')
+        .gte('date', start)
+        .lte('date', end);
+      setSchedules(data || []);
+    } catch (err) {
+      console.error('일정 데이터 로딩 실패:', err);
     }
   }
 
   function getEventsForDate(date: Date): DayEvent[] {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return leaves
+    const leaveEvents: DayEvent[] = leaves
       .filter((l) => dateStr >= l.start_date && dateStr <= l.end_date)
       .map((l) => ({
         id: l.id,
@@ -116,7 +154,24 @@ export default function CalendarPage() {
         reason: l.reason,
         start_date: l.start_date,
         end_date: l.end_date,
+        eventKind: 'leave' as const,
       }));
+    const scheduleEvents: DayEvent[] = schedules
+      .filter((s) => s.date === dateStr)
+      .map((s) => ({
+        id: s.id,
+        user_id: s.user_id,
+        name: s.profiles?.display_name || s.profiles?.email || '알 수 없음',
+        type: '일정',
+        status: '',
+        reason: s.description,
+        start_date: s.date,
+        end_date: s.date,
+        eventKind: 'schedule' as const,
+        title: s.title,
+        description: s.description,
+      }));
+    return [...leaveEvents, ...scheduleEvents];
   }
 
   function handleDayClick(date: Date) {
@@ -204,6 +259,65 @@ export default function CalendarPage() {
     }
   }
 
+  // 일정 CRUD
+  function openScheduleAddModal(dateStr: string) {
+    setEditingScheduleId(null);
+    setScheduleForm({ title: '', description: '', date: dateStr });
+    setShowDetailModal(false);
+    setShowScheduleModal(true);
+  }
+
+  function openScheduleEditModal(event: DayEvent) {
+    setEditingScheduleId(event.id);
+    setScheduleForm({
+      title: event.title || '',
+      description: event.description || '',
+      date: event.start_date,
+    });
+    setShowDetailModal(false);
+    setShowScheduleModal(true);
+  }
+
+  async function handleScheduleSave() {
+    if (!myProfile) return;
+    setSavingSchedule(true);
+    const payload = {
+      user_id: myProfile.id,
+      title: scheduleForm.title,
+      description: scheduleForm.description || null,
+      date: scheduleForm.date,
+    };
+
+    let error;
+    if (editingScheduleId) {
+      ({ error } = await supabase
+        .from('schedules')
+        .update({ title: payload.title, description: payload.description, date: payload.date })
+        .eq('id', editingScheduleId));
+    } else {
+      ({ error } = await supabase.from('schedules').insert(payload));
+    }
+
+    if (error) {
+      alert('저장 실패: ' + error.message);
+    } else {
+      setShowScheduleModal(false);
+      await fetchSchedules();
+    }
+    setSavingSchedule(false);
+  }
+
+  async function handleScheduleDelete(id: string) {
+    if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('schedules').delete().eq('id', id);
+    if (error) {
+      alert('삭제 실패: ' + error.message);
+    } else {
+      setShowDetailModal(false);
+      await fetchSchedules();
+    }
+  }
+
   const leaveTypeColor = (type: string, status: string) => {
     if (status === '대기') return 'bg-gray-100 text-gray-500 border border-dashed border-gray-300';
     switch (type) {
@@ -222,7 +336,7 @@ export default function CalendarPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">캘린더</h1>
-          <p className="mt-1 text-sm text-gray-600">휴가 일정을 확인하세요</p>
+          <p className="mt-1 text-sm text-gray-600">휴가 및 일정을 확인하세요</p>
         </div>
         {isAdmin && (
           <button
@@ -270,24 +384,41 @@ export default function CalendarPage() {
               const events = getEventsForDate(day);
               const isToday = isSameDay(day, new Date());
               const dow = day.getDay();
+              const dateStr = format(day, 'yyyy-MM-dd');
 
               return (
                 <div
                   key={day.toString()}
                   onClick={() => handleDayClick(day)}
-                  className={`min-h-16 md:min-h-24 cursor-pointer rounded-lg border p-1.5 md:p-2 transition hover:bg-gray-50 ${isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
+                  className={`group relative min-h-16 md:min-h-24 cursor-pointer rounded-lg border p-1.5 md:p-2 transition hover:bg-gray-50 ${isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
                 >
-                  <div className={`text-xs font-medium md:text-sm ${isToday ? 'text-blue-600' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
-                    {format(day, 'd')}
+                  <div className="flex items-center justify-between">
+                    <div className={`text-xs font-medium md:text-sm ${isToday ? 'text-blue-600' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700'}`}>
+                      {format(day, 'd')}
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openScheduleAddModal(dateStr); }}
+                      className="hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                      title="일정 추가"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
                   </div>
                   <div className="mt-0.5 space-y-0.5">
                     {events.slice(0, 2).map((event) => (
-                      <div key={event.id} className={`rounded px-1 py-0.5 text-xs truncate ${leaveTypeColor(event.type, event.status)}`}>
-                        {event.name}
+                      <div
+                        key={event.id}
+                        className={`rounded px-1 py-0.5 text-xs truncate ${
+                          event.eventKind === 'schedule'
+                            ? 'bg-green-100 text-green-800'
+                            : leaveTypeColor(event.type, event.status)
+                        }`}
+                      >
+                        {event.eventKind === 'schedule' ? event.title : event.name}
                       </div>
                     ))}
                     {events.length > 2 && (
-                      <div className="text-xs text-gray-400">+{events.length - 2}명</div>
+                      <div className="text-xs text-gray-400">+{events.length - 2}건</div>
                     )}
                   </div>
                 </div>
@@ -313,6 +444,10 @@ export default function CalendarPage() {
           <div className="h-3.5 w-3.5 rounded border border-dashed border-gray-300 bg-gray-100" />
           <span className="text-gray-500">대기 중</span>
         </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-3.5 w-3.5 rounded bg-green-100" />
+          <span className="text-gray-700">일정</span>
+        </div>
       </div>
 
       {/* 날짜 상세 모달 */}
@@ -333,49 +468,82 @@ export default function CalendarPage() {
                 {selectedDayEvents.map((event) => (
                   <div key={event.id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
                     <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${leaveTypeColor(event.type, event.status)}`}>
-                        {event.type}
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        event.eventKind === 'schedule'
+                          ? 'bg-green-100 text-green-800'
+                          : leaveTypeColor(event.type, event.status)
+                      }`}>
+                        {event.eventKind === 'schedule' ? '일정' : event.type}
                       </span>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{event.name}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {event.eventKind === 'schedule' ? event.title : event.name}
+                        </p>
+                        {event.eventKind === 'schedule' && (
+                          <p className="text-xs text-gray-500">{event.name}</p>
+                        )}
                         {event.reason && <p className="text-xs text-gray-400">{event.reason}</p>}
-                        <p className="text-xs text-gray-400">{event.status}</p>
+                        {event.eventKind === 'leave' && (
+                          <p className="text-xs text-gray-400">{event.status}</p>
+                        )}
                       </div>
                     </div>
-                    {isAdmin && (
-                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                        {event.status === '대기' && (
-                          <>
-                            <button onClick={() => handleStatusChange(event.id, '승인')} title="승인" className="rounded p-1 text-green-600 hover:bg-green-50">
-                              <CheckCircle className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => handleStatusChange(event.id, '반려')} title="반려" className="rounded p-1 text-red-500 hover:bg-red-50">
-                              <XCircle className="h-4 w-4" />
-                            </button>
-                          </>
-                        )}
-                        <button onClick={() => openEditModal(event)} className="rounded p-1 text-blue-500 hover:bg-blue-50 text-xs">
-                          수정
-                        </button>
-                        <button onClick={() => handleDelete(event.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                      {/* 휴가 액션 - admin만 */}
+                      {event.eventKind === 'leave' && isAdmin && (
+                        <>
+                          {event.status === '대기' && (
+                            <>
+                              <button onClick={() => handleStatusChange(event.id, '승인')} title="승인" className="rounded p-1 text-green-600 hover:bg-green-50">
+                                <CheckCircle className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => handleStatusChange(event.id, '반려')} title="반려" className="rounded p-1 text-red-500 hover:bg-red-50">
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                          <button onClick={() => openEditModal(event)} className="rounded p-1 text-blue-500 hover:bg-blue-50 text-xs">
+                            수정
+                          </button>
+                          <button onClick={() => handleDelete(event.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                      {/* 일정 액션 - 본인 또는 admin */}
+                      {event.eventKind === 'schedule' && (myProfile?.id === event.user_id || isAdmin) && (
+                        <>
+                          <button onClick={() => openScheduleEditModal(event)} className="rounded p-1 text-blue-500 hover:bg-blue-50 text-xs">
+                            수정
+                          </button>
+                          <button onClick={() => handleScheduleDelete(event.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
             <div className="mt-4 flex justify-between">
-              {isAdmin && (
+              <div className="flex gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => openAddModal(selectedDate)}
+                    className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4" /> 휴가 추가
+                  </button>
+                )}
                 <button
-                  onClick={() => openAddModal(selectedDate)}
-                  className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  onClick={() => openScheduleAddModal(selectedDate)}
+                  className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
                 >
-                  <Plus className="h-4 w-4" /> 이 날 추가
+                  <Pencil className="h-4 w-4" /> 일정 추가
                 </button>
-              )}
+              </div>
               <button
                 onClick={() => setShowDetailModal(false)}
                 className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -482,6 +650,64 @@ export default function CalendarPage() {
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 일정 추가/수정 모달 */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {editingScheduleId ? '일정 수정' : '일정 추가'}
+              </h3>
+              <button onClick={() => setShowScheduleModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
+                <input
+                  type="text"
+                  value={scheduleForm.title}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, title: e.target.value })}
+                  placeholder="일정 제목을 입력하세요"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">날짜</label>
+                <input
+                  type="date"
+                  value={scheduleForm.date}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, date: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">설명 (선택)</label>
+                <input
+                  type="text"
+                  value={scheduleForm.description}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, description: e.target.value })}
+                  placeholder="설명 입력"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setShowScheduleModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                취소
+              </button>
+              <button
+                onClick={handleScheduleSave}
+                disabled={savingSchedule || !scheduleForm.title || !scheduleForm.date}
+                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {savingSchedule ? '저장 중...' : '저장'}
               </button>
             </div>
           </div>
