@@ -5,15 +5,48 @@ import { usePathname } from 'next/navigation';
 import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Clock, UserCheck, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+const BOARD_LAST_VISIT_KEY = 'board_last_visit';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, profile } = useAuth();
   const { open, close } = useMobileMenu();
+  const [hasNewPost, setHasNewPost] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
   const isLeader = profile?.role === 'leader';
+
+  // 새 게시글 여부 확인
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    async function checkNewPosts() {
+      const lastVisit = localStorage.getItem(BOARD_LAST_VISIT_KEY);
+      const { data } = await supabase
+        .from('posts')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (data && lastVisit) {
+        setHasNewPost(new Date(data.created_at) > new Date(lastVisit));
+      } else if (data && !lastVisit) {
+        setHasNewPost(true);
+      }
+    }
+    checkNewPosts();
+  }, [user]);
+
+  // 게시판 페이지 방문 시 마지막 방문 시간 갱신
+  useEffect(() => {
+    if (pathname === '/board' || pathname?.startsWith('/board/')) {
+      localStorage.setItem(BOARD_LAST_VISIT_KEY, new Date().toISOString());
+      setHasNewPost(false);
+    }
+  }, [pathname]);
 
   const menuItems = useMemo(() => {
     const items = [
@@ -91,6 +124,11 @@ export default function Sidebar() {
                 >
                   <Icon className="h-5 w-5" />
                   {item.name}
+                  {item.href === '/board' && hasNewPost && (
+                    <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                      N
+                    </span>
+                  )}
                 </Link>
               );
             })}
