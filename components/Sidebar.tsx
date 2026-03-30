@@ -55,7 +55,7 @@ export default function Sidebar() {
       { name: '캘린더', href: '/calendar', icon: Calendar },
     ];
 
-    items.push({ name: 'KPI', href: '/kpi', icon: BarChart3 });
+    items.push({ name: 'OKR', href: '/kpi', icon: BarChart3 });
     items.push({ name: '출퇴근', href: '/attendance', icon: Clock });
 
     if (isAdmin) {
