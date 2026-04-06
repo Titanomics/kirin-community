@@ -87,7 +87,6 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
   // 1초마다 시간 업데이트
   useEffect(() => {
@@ -102,9 +101,6 @@ export default function AttendancePage() {
       setAllowed(json.allowed);
       setDetectedIp(json.ip || null);
       setTodayRecord(json.record);
-      // 서버 UA 체크 + 클라이언트 터치/화면 체크 조합
-      const clientMobile = window.screen.width < 1024 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-      setIsMobile(json.isMobileUa && clientMobile);
     } catch {}
 
     if (!user) return;
@@ -125,21 +121,48 @@ export default function AttendancePage() {
     }
   }, [user, fetchData]);
 
-  function getDeviceInfo() {
-    return {
-      screenWidth: window.screen.width,
-      touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
-      platform: navigator.userAgent,
-    };
+  // requestAnimationFrame 프레임 타이밍으로 원격 데스크톱 감지
+  function detectRemoteDesktop(): Promise<{ isRemote: boolean; stddev: number }> {
+    return new Promise((resolve) => {
+      const times: number[] = [];
+      let count = 0;
+      function measure(timestamp: number) {
+        times.push(timestamp);
+        count++;
+        if (count < 60) {
+          requestAnimationFrame(measure);
+        } else {
+          const deltas: number[] = [];
+          for (let i = 1; i < times.length; i++) {
+            deltas.push(times[i] - times[i - 1]);
+          }
+          const avg = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+          const variance = deltas.reduce((a, b) => a + (b - avg) ** 2, 0) / deltas.length;
+          const stddev = Math.sqrt(variance);
+          // 일반 모니터: stddev < 3ms (안정적인 60fps)
+          // 원격 데스크톱: stddev > 5ms (불규칙한 프레임 스트리밍)
+          resolve({ isRemote: stddev > 5, stddev: Math.round(stddev * 100) / 100 });
+        }
+      }
+      requestAnimationFrame(measure);
+    });
   }
 
   async function handleAction(action: 'check_in' | 'check_out') {
     setActionLoading(true);
     try {
+      // 원격 데스크톱 감지
+      const { isRemote, stddev } = await detectRemoteDesktop();
+      if (isRemote) {
+        alert('원격 데스크톱 환경에서는 출퇴근이 불가합니다. 사무실 PC에서 직접 접속해주세요.');
+        setActionLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, deviceInfo: getDeviceInfo() }),
+        body: JSON.stringify({ action, frameStddev: stddev }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -300,15 +323,10 @@ export default function AttendancePage() {
             회사 WiFi에서만 출퇴근이 가능합니다
           </p>
         )}
-        {allowed && isMobile === false && (
-          <p className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700 text-center">
-            📱 모바일 기기에서만 출퇴근이 가능합니다. 핸드폰으로 접속해주세요.
-          </p>
-        )}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => handleAction('check_in')}
-            disabled={!allowed || isMobile === false || !!todayRecord?.check_in || actionLoading}
+            disabled={!allowed || !!todayRecord?.check_in || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-4 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_in ? (
@@ -319,7 +337,7 @@ export default function AttendancePage() {
           </button>
           <button
             onClick={() => handleAction('check_out')}
-            disabled={!allowed || isMobile === false || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
+            disabled={!allowed || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-gray-700 py-4 text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_out ? (
