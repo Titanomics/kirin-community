@@ -82,7 +82,31 @@ export async function GET(request: NextRequest) {
     .eq('date', today)
     .single();
 
-  return NextResponse.json({ allowed, ip, record: record || null });
+  const ua = request.headers.get('user-agent') || '';
+  const mobileUaPattern = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i;
+  const isMobileUa = mobileUaPattern.test(ua);
+
+  return NextResponse.json({ allowed, ip, record: record || null, isMobileUa });
+}
+
+// 모바일 디바이스 검증
+function isMobileDevice(ua: string, deviceInfo?: { screenWidth?: number; touchSupport?: boolean; platform?: string }): boolean {
+  // 1) User-Agent 모바일 패턴 체크
+  const mobileUaPattern = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i;
+  const uaIsMobile = mobileUaPattern.test(ua);
+
+  // 2) 디바이스 정보가 있으면 추가 검증 (크롬 원격 데스크톱 차단)
+  if (deviceInfo) {
+    const { screenWidth, touchSupport, platform } = deviceInfo;
+    // 화면 너비가 1024 이상이면 PC로 판단 (태블릿 가로모드도 대부분 1024 미만)
+    if (screenWidth && screenWidth >= 1024) return false;
+    // 터치 미지원이면 PC
+    if (touchSupport === false) return false;
+    // platform이 명시적으로 데스크톱이면 차단
+    if (platform && /Win|Mac|Linux/i.test(platform) && !(/Android|iPhone|iPad/i.test(platform))) return false;
+  }
+
+  return uaIsMobile;
 }
 
 // POST: 출근 / 퇴근 처리
@@ -102,7 +126,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
   }
 
-  const { action } = await request.json() as { action: 'check_in' | 'check_out' };
+  const body = await request.json() as { action: 'check_in' | 'check_out'; deviceInfo?: { screenWidth?: number; touchSupport?: boolean; platform?: string } };
+  const { action, deviceInfo } = body;
+
+  // 모바일 디바이스 검증
+  const ua = request.headers.get('user-agent') || '';
+  if (!isMobileDevice(ua, deviceInfo)) {
+    return NextResponse.json(
+      { error: '모바일 기기에서만 출퇴근이 가능합니다. 핸드폰으로 접속해주세요.' },
+      { status: 403 }
+    );
+  }
   const supabase = await createClient();
   const now = new Date();
   const today = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });

@@ -87,6 +87,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
   // 1초마다 시간 업데이트
   useEffect(() => {
@@ -101,6 +102,9 @@ export default function AttendancePage() {
       setAllowed(json.allowed);
       setDetectedIp(json.ip || null);
       setTodayRecord(json.record);
+      // 서버 UA 체크 + 클라이언트 터치/화면 체크 조합
+      const clientMobile = window.screen.width < 1024 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+      setIsMobile(json.isMobileUa && clientMobile);
     } catch {}
 
     if (!user) return;
@@ -121,13 +125,21 @@ export default function AttendancePage() {
     }
   }, [user, fetchData]);
 
+  function getDeviceInfo() {
+    return {
+      screenWidth: window.screen.width,
+      touchSupport: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+      platform: navigator.userAgent,
+    };
+  }
+
   async function handleAction(action: 'check_in' | 'check_out') {
     setActionLoading(true);
     try {
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, deviceInfo: getDeviceInfo() }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -288,10 +300,15 @@ export default function AttendancePage() {
             회사 WiFi에서만 출퇴근이 가능합니다
           </p>
         )}
+        {allowed && isMobile === false && (
+          <p className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700 text-center">
+            📱 모바일 기기에서만 출퇴근이 가능합니다. 핸드폰으로 접속해주세요.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => handleAction('check_in')}
-            disabled={!allowed || !!todayRecord?.check_in || actionLoading}
+            disabled={!allowed || isMobile === false || !!todayRecord?.check_in || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-4 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_in ? (
@@ -302,7 +319,7 @@ export default function AttendancePage() {
           </button>
           <button
             onClick={() => handleAction('check_out')}
-            disabled={!allowed || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
+            disabled={!allowed || isMobile === false || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-gray-700 py-4 text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_out ? (
