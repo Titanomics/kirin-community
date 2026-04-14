@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { Edit, Search, Download, Save, X, UserX } from 'lucide-react';
 import { format, differenceInMonths, eachDayOfInterval } from 'date-fns';
+import { calcLeaveBalance } from '@/lib/leaveBalance';
 
 interface Profile {
   id: string;
@@ -31,28 +32,6 @@ interface LeaveRequest {
 function countBusinessDays(start: string, end: string): number {
   const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) });
   return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
-}
-
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
-  if (!joinedAt) return null;
-  const today = new Date();
-  const totalMonths = differenceInMonths(today, new Date(joinedAt));
-  const years = Math.floor(totalMonths / 12);
-
-  const used = approvedLeaves.reduce((sum, l) => {
-    if (l.leave_type === '반차') return sum + 0.5;
-    return sum + countBusinessDays(l.start_date, l.end_date);
-  }, 0);
-
-  if (years < 1) {
-    const autoTotal = Math.min(totalMonths, 12);
-    const total = autoTotal + adjustment;
-    return { kind: '월차' as const, total, autoTotal, used, remaining: Math.max(0, total - used) };
-  } else {
-    const autoTotal = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
-    const total = autoTotal + adjustment;
-    return { kind: '연차' as const, total, autoTotal, used, remaining: Math.max(0, total - used) };
-  }
 }
 
 export default function EmployeesPage() {
@@ -170,7 +149,7 @@ export default function EmployeesPage() {
     setSaving(true);
     const targetTotal = parseFloat(editForm.leave_remaining);
     const autoBalance = calcLeaveBalance(editForm.joined_at, [], 0);
-    const adjustment = isNaN(targetTotal) || !autoBalance ? null : targetTotal - autoBalance.autoTotal;
+    const adjustment = isNaN(targetTotal) || autoBalance.kind === '미설정' ? null : targetTotal - autoBalance.autoTotal;
 
     const updateData: Record<string, string | number | null> = {
       joined_at: editForm.joined_at || null,
@@ -199,7 +178,7 @@ export default function EmployeesPage() {
     if (isNaN(target)) { setLeaveEditingId(null); return; }
     const profile = profiles.find((pr) => pr.id === id);
     const autoBalance = calcLeaveBalance(profile?.joined_at ?? null, [], 0);
-    if (!autoBalance) { setLeaveEditingId(null); return; }
+    if (autoBalance.kind === '미설정') { setLeaveEditingId(null); return; }
     let newTotal: number;
     if (leaveEditField === 'remaining') {
       const used = (leavesByUser[id] || []).reduce((s, l) => s + (l.leave_type === '반차' ? 0.5 : countBusinessDays(l.start_date, l.end_date)), 0);
@@ -218,7 +197,7 @@ export default function EmployeesPage() {
     const headers = ['이름', '이메일', '역할', '팀', '입사일', '근속기간', '생일', '잔여연차/월차'];
     const data = profiles.map((p) => {
       const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? 0);
-      const balanceStr = balance ? `${balance.kind} ${balance.remaining}/${balance.total}` : '-';
+      const balanceStr = balance.kind === '미설정' ? '-' : `${balance.kind} ${balance.remaining}/${balance.total}`;
       return [
         p.display_name || '-',
         p.email || '-',
@@ -311,7 +290,7 @@ export default function EmployeesPage() {
               {filteredProfiles.map((p) => {
                 const balance = calcLeaveBalance(p.joined_at, leavesByUser[p.id] || [], p.leave_total_override ?? 0);
                 const balanceColor =
-                  !balance
+                  balance.kind === '미설정'
                     ? 'text-gray-400'
                     : balance.remaining === 0
                     ? 'text-red-600'
@@ -398,7 +377,7 @@ export default function EmployeesPage() {
                           <span className="text-xs text-gray-400">
                             자동: {(() => {
                               const base = calcLeaveBalance(editForm.joined_at, leavesByUser[p.id] || [], 0);
-                              return base ? `총 ${base.autoTotal}개 (${base.kind})` : '-';
+                              return base.kind === '미설정' ? '-' : `총 ${base.autoTotal}개 (${base.kind})`;
                             })()}
                           </span>
                           <div className="flex items-center gap-1">
@@ -443,32 +422,39 @@ export default function EmployeesPage() {
                             })()}
                           </span>
                         </div>
-                      ) : balance ? (
-                        <div className="flex items-center gap-1.5">
-                          {isAdmin && !p.resigned_at ? (
-                            <>
-                              <button
-                                onClick={() => { setLeaveEditingId(p.id); setLeaveEditField('remaining'); setLeaveEditValue(String(balance.remaining)); }}
-                                className={`font-semibold ${balanceColor} hover:underline`}
-                                title="잔여 수정"
-                              >{balance.remaining}</button>
-                              <span className="text-gray-400">/</span>
-                              <button
-                                onClick={() => { setLeaveEditingId(p.id); setLeaveEditField('total'); setLeaveEditValue(String(balance.total)); }}
-                                className="text-gray-500 hover:underline"
-                                title="총량 수정"
-                              >{balance.total}</button>
-                            </>
-                          ) : (
-                            <>
-                              <span className={`font-semibold ${balanceColor}`}>{balance.remaining}</span>
-                              <span className="text-gray-400">/ {balance.total}</span>
-                            </>
+                      ) : balance.kind !== '미설정' ? (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            {isAdmin && !p.resigned_at ? (
+                              <>
+                                <button
+                                  onClick={() => { setLeaveEditingId(p.id); setLeaveEditField('remaining'); setLeaveEditValue(String(balance.remaining)); }}
+                                  className={`font-semibold ${balanceColor} hover:underline`}
+                                  title="잔여 수정"
+                                >{balance.remaining}</button>
+                                <span className="text-gray-400">/</span>
+                                <button
+                                  onClick={() => { setLeaveEditingId(p.id); setLeaveEditField('total'); setLeaveEditValue(String(balance.total)); }}
+                                  className="text-gray-500 hover:underline"
+                                  title="총량 수정"
+                                >{balance.total}</button>
+                              </>
+                            ) : (
+                              <>
+                                <span className={`font-semibold ${balanceColor}`}>{balance.remaining}</span>
+                                <span className="text-gray-400">/ {balance.total}</span>
+                              </>
+                            )}
+                            <span className="text-xs text-gray-500">{balance.kind}</span>
+                          </div>
+                          {balance.nextIncreaseDate && balance.daysUntilNext !== null && (
+                            <span className="text-[10px] text-gray-400">
+                              다음 +1: {balance.nextIncreaseDate} (D-{balance.daysUntilNext})
+                            </span>
                           )}
-                          <span className="text-xs text-gray-500">{balance.kind}</span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-gray-400" title="입사일 미입력">-</span>
                       )}
                     </td>
                     {isAdmin && (

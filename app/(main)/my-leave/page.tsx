@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { CalendarDays, Clock, CheckCircle, XCircle, Plus, X } from 'lucide-react';
-import { differenceInMonths, eachDayOfInterval } from 'date-fns';
+import { calcLeaveBalance } from '@/lib/leaveBalance';
 
 interface LeaveRequest {
   id: string;
@@ -14,45 +14,6 @@ interface LeaveRequest {
   reason: string | null;
   status: '대기' | '승인' | '반려';
   created_at: string;
-}
-
-function countBusinessDays(start: string, end: string): number {
-  const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) });
-  return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
-}
-
-function calcLeaveBalance(joinedAt: string | null, approvedLeaves: LeaveRequest[], adjustment = 0) {
-  if (!joinedAt) return null;
-  const today = new Date();
-  const totalMonths = differenceInMonths(today, new Date(joinedAt));
-  const years = Math.floor(totalMonths / 12);
-
-  const used = approvedLeaves.reduce((sum, l) => {
-    if (l.leave_type === '반차') return sum + 0.5;
-    return sum + countBusinessDays(l.start_date, l.end_date);
-  }, 0);
-
-  if (years < 1) {
-    const autoTotal = Math.min(totalMonths, 12);
-    const total = autoTotal + adjustment;
-    return {
-      kind: '월차' as const,
-      total,
-      used,
-      remaining: Math.max(0, total - used),
-      note: `입사 후 ${totalMonths}개월 경과 · 매월 1개 자동 부여 (최대 12개)`,
-    };
-  } else {
-    const autoTotal = Math.min(15 + Math.max(0, Math.floor((years - 1) / 2)), 25);
-    const total = autoTotal + adjustment;
-    return {
-      kind: '연차' as const,
-      total,
-      used,
-      remaining: Math.max(0, total - used),
-      note: `근속 ${years}년 · 기본 15일 + 추가 ${autoTotal - 15}일`,
-    };
-  }
 }
 
 const statusConfig = {
@@ -149,7 +110,11 @@ export default function MyLeavePage() {
       </div>
 
       {/* Balance Card */}
-      {balance ? (
+      {balance.kind === '미설정' ? (
+        <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
+          입사일 정보가 없어 잔여 연차를 계산할 수 없습니다. 관리자에게 문의하세요.
+        </div>
+      ) : (
         <div className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white shadow-lg">
           <p className="text-sm font-medium text-blue-100">잔여 {balance.kind}</p>
           <div className="mt-1 flex items-baseline gap-2">
@@ -161,6 +126,11 @@ export default function MyLeavePage() {
             {(balance.total - balance.remaining) > 0 && ` · 사용 ${balance.total - balance.remaining}개`}
           </p>
           <p className="mt-2 text-sm text-blue-100">{balance.note}</p>
+          {balance.nextIncreaseDate && balance.daysUntilNext !== null && (
+            <p className="mt-1 text-sm text-blue-100">
+              🗓️ 다음 증가: <strong>{balance.nextIncreaseDate}</strong> (D-{balance.daysUntilNext})
+            </p>
+          )}
           {balance.total > 0 && (
             <div className="mt-4">
               <div className="h-2 w-full overflow-hidden rounded-full bg-blue-500/50">
@@ -174,10 +144,6 @@ export default function MyLeavePage() {
               </p>
             </div>
           )}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
-          입사일 정보가 없어 잔여 연차를 계산할 수 없습니다. 관리자에게 문의하세요.
         </div>
       )}
 
