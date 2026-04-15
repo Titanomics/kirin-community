@@ -117,10 +117,13 @@ export default function HospitalsPage() {
 
   const [saving, setSaving] = useState(false);
   const canEdit = !!profile;
+  const isAdmin = profile?.role === 'admin';
+  const hasAccess = isAdmin || profile?.team === '콘텐츠팀';
 
   useEffect(() => {
+    if (!hasAccess) return;
     fetchData();
-  }, []);
+  }, [hasAccess]);
 
   async function fetchData() {
     setLoading(true);
@@ -313,6 +316,15 @@ export default function HospitalsPage() {
     const d = daysUntil(t.due_date);
     return d !== null && d < 0;
   }).length;
+
+  if (profile && !hasAccess) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 text-gray-500">
+        <p className="text-lg font-semibold">접근 권한이 없습니다</p>
+        <p className="text-sm">병원 관리는 콘텐츠팀 전용 페이지입니다</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

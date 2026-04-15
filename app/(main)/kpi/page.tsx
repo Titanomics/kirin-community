@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { Plus, X, Trash2, Target, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil } from 'lucide-react';
+import { Plus, X, Trash2, Target, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, User, Users as UsersIcon } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -38,6 +38,32 @@ interface Objective {
   created_at: string;
   profiles?: { display_name: string | null; email: string | null } | null;
   okr_key_results?: KeyResult[];
+}
+
+interface TeamKeyResult {
+  id: string;
+  team_objective_id: string;
+  title: string;
+  type: 'numeric' | 'binary';
+  target_value: number | null;
+  current_value: number | null;
+  status: string;
+  due_date: string | null;
+  memo: string | null;
+  sort_order: number;
+}
+
+interface TeamObjective {
+  id: string;
+  team: string;
+  title: string;
+  description: string | null;
+  period: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  created_at: string;
+  team_key_results?: TeamKeyResult[];
 }
 
 export default function OkrPage() {
@@ -83,20 +109,58 @@ export default function OkrPage() {
   const isLeader = myProfile?.role === 'leader';
   const canEdit = isAdmin || isLeader;
 
+  // 팀 OKR
+  const [tab, setTab] = useState<'individual' | 'team'>('individual');
+  const [teamObjectives, setTeamObjectives] = useState<TeamObjective[]>([]);
+  const [teamExpandedIds, setTeamExpandedIds] = useState<Set<string>>(new Set());
+  const [teamViewTeam, setTeamViewTeam] = useState<'커머스팀' | '콘텐츠팀'>(
+    myProfile?.team === '콘텐츠팀' ? '콘텐츠팀' : '커머스팀'
+  );
+
+  const [showTeamObjModal, setShowTeamObjModal] = useState(false);
+  const [editingTeamObjId, setEditingTeamObjId] = useState<string | null>(null);
+  const [teamObjForm, setTeamObjForm] = useState({
+    team: '커머스팀' as '커머스팀' | '콘텐츠팀',
+    title: '',
+    description: '',
+    period: '',
+    start_date: '',
+    end_date: '',
+    status: '진행중',
+  });
+
+  const [showTeamKrModal, setShowTeamKrModal] = useState(false);
+  const [editingTeamKrId, setEditingTeamKrId] = useState<string | null>(null);
+  const [teamKrParentId, setTeamKrParentId] = useState('');
+  const [teamKrForm, setTeamKrForm] = useState({
+    title: '',
+    type: 'numeric' as 'numeric' | 'binary',
+    target_value: '',
+    current_value: '',
+    status: '진행중',
+    due_date: '',
+    memo: '',
+  });
+
   useEffect(() => {
     fetchData();
   }, []);
 
   async function fetchData() {
-    const [objRes, profRes] = await Promise.all([
+    const [objRes, profRes, teamObjRes] = await Promise.all([
       supabase
         .from('okr_objectives')
         .select('*, profiles(display_name, email), okr_key_results(*)')
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('*').is('resigned_at', null),
+      supabase
+        .from('team_objectives')
+        .select('*, team_key_results(*)')
+        .order('created_at', { ascending: false }),
     ]);
     setObjectives(objRes.data || []);
     setProfiles(profRes.data || []);
+    setTeamObjectives(teamObjRes.data || []);
     setLoading(false);
   }
 
@@ -261,6 +325,150 @@ export default function OkrPage() {
     setObjForm({ ...objForm, user_id: userId, team: p?.team || '커머스팀' });
   }
 
+  // --- 팀 OKR CRUD ---
+  function toggleTeamExpand(id: string) {
+    setTeamExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function openTeamObjAdd() {
+    setEditingTeamObjId(null);
+    const now = new Date();
+    const q = Math.ceil((now.getMonth() + 1) / 3);
+    setTeamObjForm({
+      team: teamViewTeam,
+      title: '',
+      description: '',
+      period: `${now.getFullYear()}-Q${q}`,
+      start_date: now.toISOString().slice(0, 10),
+      end_date: '',
+      status: '진행중',
+    });
+    setShowTeamObjModal(true);
+  }
+
+  function openTeamObjEdit(obj: TeamObjective) {
+    setEditingTeamObjId(obj.id);
+    setTeamObjForm({
+      team: obj.team as '커머스팀' | '콘텐츠팀',
+      title: obj.title,
+      description: obj.description || '',
+      period: obj.period,
+      start_date: obj.start_date,
+      end_date: obj.end_date,
+      status: obj.status,
+    });
+    setShowTeamObjModal(true);
+  }
+
+  async function handleTeamObjSave() {
+    if (!myProfile) return;
+    if (!teamObjForm.title || !teamObjForm.start_date || !teamObjForm.end_date) {
+      alert('필수 입력 항목을 채워주세요');
+      return;
+    }
+    setSaving(true);
+    const payload = {
+      team: teamObjForm.team,
+      title: teamObjForm.title,
+      description: teamObjForm.description || null,
+      period: teamObjForm.period,
+      start_date: teamObjForm.start_date,
+      end_date: teamObjForm.end_date,
+      status: teamObjForm.status,
+    };
+    let error;
+    if (editingTeamObjId) {
+      ({ error } = await supabase.from('team_objectives').update(payload).eq('id', editingTeamObjId));
+    } else {
+      ({ error } = await supabase.from('team_objectives').insert({ ...payload, created_by: myProfile.id }));
+    }
+    if (error) alert('저장 실패: ' + error.message);
+    else { setShowTeamObjModal(false); await fetchData(); }
+    setSaving(false);
+  }
+
+  async function handleTeamObjDelete(id: string) {
+    if (!confirm('이 팀 목표를 삭제하시겠습니까? KR도 함께 삭제됩니다.')) return;
+    const { error } = await supabase.from('team_objectives').delete().eq('id', id);
+    if (error) alert('삭제 실패: ' + error.message);
+    else await fetchData();
+  }
+
+  function openTeamKrAdd(parentId: string) {
+    setEditingTeamKrId(null);
+    setTeamKrParentId(parentId);
+    setTeamKrForm({
+      title: '', type: 'numeric', target_value: '', current_value: '',
+      status: '진행중', due_date: '', memo: '',
+    });
+    setShowTeamKrModal(true);
+  }
+
+  function openTeamKrEdit(kr: TeamKeyResult) {
+    setEditingTeamKrId(kr.id);
+    setTeamKrParentId(kr.team_objective_id);
+    setTeamKrForm({
+      title: kr.title,
+      type: kr.type,
+      target_value: kr.target_value?.toString() || '',
+      current_value: kr.current_value?.toString() || '',
+      status: kr.status,
+      due_date: kr.due_date || '',
+      memo: kr.memo || '',
+    });
+    setShowTeamKrModal(true);
+  }
+
+  async function handleTeamKrSave() {
+    if (!teamKrForm.title) { alert('제목을 입력해주세요'); return; }
+    setSaving(true);
+    const payload = {
+      team_objective_id: teamKrParentId,
+      title: teamKrForm.title,
+      type: teamKrForm.type,
+      target_value: teamKrForm.target_value ? parseFloat(teamKrForm.target_value) : null,
+      current_value: teamKrForm.current_value ? parseFloat(teamKrForm.current_value) : null,
+      status: teamKrForm.status,
+      due_date: teamKrForm.due_date || null,
+      memo: teamKrForm.memo || null,
+    };
+    let error;
+    if (editingTeamKrId) {
+      ({ error } = await supabase.from('team_key_results').update(payload).eq('id', editingTeamKrId));
+    } else {
+      ({ error } = await supabase.from('team_key_results').insert(payload));
+    }
+    if (error) alert('저장 실패: ' + error.message);
+    else { setShowTeamKrModal(false); await fetchData(); }
+    setSaving(false);
+  }
+
+  async function handleTeamKrDelete(id: string) {
+    if (!confirm('이 KR을 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('team_key_results').delete().eq('id', id);
+    if (error) alert('삭제 실패: ' + error.message);
+    else await fetchData();
+  }
+
+  function calcTeamObjectiveProgress(obj: TeamObjective): number {
+    const krs = obj.team_key_results || [];
+    if (krs.length === 0) return 0;
+    let sum = 0;
+    for (const kr of krs) {
+      if (kr.status === '완료') { sum += 100; continue; }
+      if (kr.type === 'numeric' && kr.target_value && kr.target_value > 0) {
+        sum += Math.min(((kr.current_value || 0) / kr.target_value) * 100, 100);
+      }
+    }
+    return sum / krs.length;
+  }
+
+  const filteredTeamObjectives = teamObjectives.filter((o) => o.team === teamViewTeam);
+
   // --- 필터링 ---
   const filtered = objectives.filter((o) => {
     if (!canEdit && myProfile) return o.user_id === myProfile.id;
@@ -327,17 +535,170 @@ export default function OkrPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">OKR</h1>
           <p className="mt-1 text-sm text-gray-600">목표(Objective)와 핵심 결과(Key Result)를 관리하세요</p>
         </div>
-        {canEdit && (
+        {canEdit && tab === 'individual' && (
           <button onClick={openObjAdd} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-            <Plus className="h-4 w-4" /> 목표 추가
+            <Plus className="h-4 w-4" /> 개인 목표 추가
+          </button>
+        )}
+        {canEdit && tab === 'team' && (
+          <button onClick={openTeamObjAdd} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            <Plus className="h-4 w-4" /> 팀 목표 추가
           </button>
         )}
       </div>
+
+      {/* 탭 */}
+      <div className="flex rounded-lg border border-gray-200 bg-white p-1 w-fit">
+        <button
+          onClick={() => setTab('individual')}
+          className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium transition ${
+            tab === 'individual' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <User className="h-4 w-4" /> 개인 OKR
+        </button>
+        <button
+          onClick={() => setTab('team')}
+          className={`flex items-center gap-2 rounded px-4 py-2 text-sm font-medium transition ${
+            tab === 'team' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <UsersIcon className="h-4 w-4" /> 팀 OKR
+        </button>
+      </div>
+
+      {tab === 'team' && (
+        <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
+              {(['커머스팀', '콘텐츠팀'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTeamViewTeam(t)}
+                  className={`rounded px-3 py-1.5 text-sm font-medium transition ${
+                    teamViewTeam === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">팀 OKR은 admin/팀장만 생성·수정할 수 있습니다</p>
+          </div>
+
+          {filteredTeamObjectives.length === 0 ? (
+            <div className="rounded-lg bg-white p-12 text-center shadow">
+              <UsersIcon className="mx-auto h-12 w-12 text-gray-300" />
+              <p className="mt-4 text-gray-500">{teamViewTeam} 팀 OKR이 아직 없습니다</p>
+              {canEdit && <p className="mt-1 text-sm text-gray-400">팀 목표 추가 버튼으로 시작하세요</p>}
+            </div>
+          ) : (
+            <div className="rounded-lg bg-white shadow divide-y divide-gray-100">
+              {filteredTeamObjectives.map((obj) => {
+                const progress = calcTeamObjectiveProgress(obj);
+                const krs = obj.team_key_results || [];
+                const isExpanded = teamExpandedIds.has(obj.id);
+                return (
+                  <div key={obj.id} className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => toggleTeamExpand(obj.id)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                        {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                      </button>
+                      <UsersIcon className="h-5 w-5 text-indigo-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900">{obj.title}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge(obj.status)}`}>{obj.status}</span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                          <span>{obj.period}</span>
+                          <span>{obj.start_date} ~ {obj.end_date}</span>
+                          <span>KR {krs.length}개</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <div className={`text-lg font-bold ${progress >= 70 ? 'text-green-600' : progress >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                            {progress.toFixed(0)}%
+                          </div>
+                        </div>
+                        {canEdit && (
+                          <>
+                            <button onClick={() => openTeamObjEdit(obj)} className="rounded p-1.5 text-blue-500 hover:bg-blue-50">
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleTeamObjDelete(obj.id)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {obj.description && (
+                      <p className="mt-2 ml-12 text-sm text-gray-600">{obj.description}</p>
+                    )}
+                    {isExpanded && (
+                      <div className="mt-3 ml-12 space-y-2">
+                        {krs.length === 0 ? (
+                          <p className="text-sm text-gray-400">등록된 KR이 없습니다</p>
+                        ) : (
+                          krs.map((kr) => {
+                            const krProg = kr.status === '완료' ? 100 :
+                              (kr.type === 'numeric' && kr.target_value && kr.target_value > 0)
+                                ? Math.min(((kr.current_value || 0) / kr.target_value) * 100, 100)
+                                : 0;
+                            return (
+                              <div key={kr.id} className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                                {kr.status === '완료' ? <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" /> : <Circle className="h-4 w-4 text-gray-300 flex-shrink-0" />}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-gray-700 truncate">{kr.title}</p>
+                                  {kr.type === 'numeric' && (
+                                    <p className="text-xs text-gray-500">
+                                      {kr.current_value || 0} / {kr.target_value || 0}
+                                      {kr.due_date && ` · 마감 ${formatDate(kr.due_date)}`}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
+                                  <div className={`h-full ${krProg >= 70 ? 'bg-green-500' : krProg >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${krProg}%` }} />
+                                </div>
+                                <span className="text-xs font-medium text-gray-500 w-10 text-right flex-shrink-0">{krProg.toFixed(0)}%</span>
+                                {canEdit && (
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button onClick={() => openTeamKrEdit(kr)} className="rounded p-1 text-blue-500 hover:bg-blue-100">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button onClick={() => handleTeamKrDelete(kr.id)} className="rounded p-1 text-gray-400 hover:bg-gray-200">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                        {canEdit && (
+                          <button onClick={() => openTeamKrAdd(obj.id)} className="flex items-center gap-1 rounded-lg border border-dashed border-gray-300 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50">
+                            <Plus className="h-3.5 w-3.5" /> KR 추가
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'individual' && (
+        <>
 
       {/* 필터 */}
       {canEdit && (
@@ -525,6 +886,9 @@ export default function OkrPage() {
         </div>
       )}
 
+        </>
+      )}
+
       {/* Objective 모달 */}
       {showObjModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -643,6 +1007,147 @@ export default function OkrPage() {
               <button onClick={() => setShowKrModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">취소</button>
               <button onClick={handleKrSave} disabled={saving || !krForm.title}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                {saving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 팀 Objective 모달 */}
+      {showTeamObjModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">{editingTeamObjId ? '팀 목표 수정' : '팀 목표 추가'}</h3>
+              <button onClick={() => setShowTeamObjModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">팀</label>
+                <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
+                  {(['커머스팀', '콘텐츠팀'] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setTeamObjForm({ ...teamObjForm, team: t })}
+                      className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition ${teamObjForm.team === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">목표 (Objective)</label>
+                <input type="text" value={teamObjForm.title} onChange={(e) => setTeamObjForm({ ...teamObjForm, title: e.target.value })}
+                  placeholder="예: 자사몰 매출 2배 성장" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">설명 (선택)</label>
+                <textarea value={teamObjForm.description} onChange={(e) => setTeamObjForm({ ...teamObjForm, description: e.target.value })}
+                  rows={2} placeholder="팀 OKR의 배경·의도" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">기간</label>
+                  <input type="text" value={teamObjForm.period} onChange={(e) => setTeamObjForm({ ...teamObjForm, period: e.target.value })}
+                    placeholder="예: 2026-Q2" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                  <select value={teamObjForm.status} onChange={(e) => setTeamObjForm({ ...teamObjForm, status: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                    <option value="예정">예정</option>
+                    <option value="진행중">진행중</option>
+                    <option value="완료">완료</option>
+                    <option value="보류">보류</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                  <input type="date" value={teamObjForm.start_date} onChange={(e) => setTeamObjForm({ ...teamObjForm, start_date: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                  <input type="date" value={teamObjForm.end_date} min={teamObjForm.start_date} onChange={(e) => setTeamObjForm({ ...teamObjForm, end_date: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setShowTeamObjModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">취소</button>
+              <button onClick={handleTeamObjSave} disabled={saving}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                {saving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 팀 KR 모달 */}
+      {showTeamKrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">{editingTeamKrId ? '팀 KR 수정' : '팀 KR 추가'}</h3>
+              <button onClick={() => setShowTeamKrModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">핵심 결과 (Key Result)</label>
+                <input type="text" value={teamKrForm.title} onChange={(e) => setTeamKrForm({ ...teamKrForm, title: e.target.value })}
+                  placeholder="예: 월 매출 5억 달성" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">유형</label>
+                  <select value={teamKrForm.type} onChange={(e) => setTeamKrForm({ ...teamKrForm, type: e.target.value as 'numeric' | 'binary' })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                    <option value="numeric">숫자형</option>
+                    <option value="binary">달성/미달성</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                  <select value={teamKrForm.status} onChange={(e) => setTeamKrForm({ ...teamKrForm, status: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                    <option value="예정">예정</option>
+                    <option value="진행중">진행중</option>
+                    <option value="완료">완료</option>
+                    <option value="보류">보류</option>
+                  </select>
+                </div>
+              </div>
+              {teamKrForm.type === 'numeric' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">현재값</label>
+                    <input type="number" value={teamKrForm.current_value} onChange={(e) => setTeamKrForm({ ...teamKrForm, current_value: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">목표값</label>
+                    <input type="number" value={teamKrForm.target_value} onChange={(e) => setTeamKrForm({ ...teamKrForm, target_value: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">마감일 (선택)</label>
+                <input type="date" value={teamKrForm.due_date} onChange={(e) => setTeamKrForm({ ...teamKrForm, due_date: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">메모 (선택)</label>
+                <input type="text" value={teamKrForm.memo} onChange={(e) => setTeamKrForm({ ...teamKrForm, memo: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setShowTeamKrModal(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">취소</button>
+              <button onClick={handleTeamKrSave} disabled={saving}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>

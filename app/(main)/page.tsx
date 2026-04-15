@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { Users, Clock, CheckCircle, XCircle, Gift, Award, Target, Building2, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Users, Clock, CheckCircle, XCircle, Gift, Award, Target, Building2, AlertTriangle, ChevronRight, CalendarDays, User } from 'lucide-react';
 import Link from 'next/link';
 
 interface Profile {
@@ -72,6 +72,26 @@ interface Objective {
   okr_key_results: Array<{ status: string; type: string; target_value: number | null; current_value: number | null }>;
 }
 
+interface TeamObjective {
+  id: string;
+  team: string;
+  title: string;
+  status: string;
+  period: string;
+  team_key_results: Array<{ status: string; type: string; target_value: number | null; current_value: number | null }>;
+}
+
+interface RoadmapItem {
+  id: string;
+  team: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  color: string;
+  status: string;
+  assignee: { display_name: string | null; email: string | null } | null;
+}
+
 const COLOR_BAR: Record<string, string> = {
   blue: 'bg-blue-500', green: 'bg-green-500', purple: 'bg-purple-500',
   orange: 'bg-orange-500', pink: 'bg-pink-500', gray: 'bg-gray-500',
@@ -96,6 +116,8 @@ export default function Home() {
   const [hospitalTasks, setHospitalTasks] = useState<HospitalTask[]>([]);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [objectives, setObjectives] = useState<Objective[]>([]);
+  const [teamObjectivesData, setTeamObjectivesData] = useState<TeamObjective[]>([]);
+  const [roadmapItems, setRoadmapItems] = useState<RoadmapItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const isAdmin = myProfile?.role === 'admin';
@@ -117,7 +139,15 @@ export default function Home() {
 
   async function fetchData() {
     try {
-      const [profilesRes, pendingRes, plansRes, goalsRes, tasksRes, hospitalsRes, objRes] = await Promise.all([
+      const today = new Date();
+      // 미니 캘린더용: 이번 달 전체
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const windowStart = monthStart;
+      const windowEnd = monthEnd;
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+      const [profilesRes, pendingRes, plansRes, goalsRes, tasksRes, hospitalsRes, objRes, teamObjRes, roadmapRes] = await Promise.all([
         supabase.from('profiles').select('*').is('resigned_at', null),
         supabase
           .from('leave_requests')
@@ -129,6 +159,14 @@ export default function Home() {
         supabase.from('hospital_tasks').select('*').neq('status', '완료').order('due_date', { ascending: true, nullsFirst: false }).limit(20),
         supabase.from('hospitals').select('id, name'),
         supabase.from('okr_objectives').select('*, okr_key_results(status, type, target_value, current_value)').eq('status', '진행중'),
+        supabase.from('team_objectives').select('*, team_key_results(status, type, target_value, current_value)').eq('status', '진행중'),
+        supabase
+          .from('team_roadmap')
+          .select('*, assignee:profiles!team_roadmap_assignee_id_fkey(display_name, email)')
+          .lte('start_date', fmt(windowEnd))
+          .gte('end_date', fmt(windowStart))
+          .neq('status', '완료')
+          .order('start_date'),
       ]);
       setProfiles((profilesRes.data as Profile[]) || []);
       setPendingLeaves((pendingRes.data as LeaveRequest[]) || []);
@@ -137,6 +175,8 @@ export default function Home() {
       setHospitalTasks((tasksRes.data as HospitalTask[]) || []);
       setHospitals((hospitalsRes.data as Hospital[]) || []);
       setObjectives((objRes.data as Objective[]) || []);
+      setTeamObjectivesData((teamObjRes.data as TeamObjective[]) || []);
+      setRoadmapItems((roadmapRes.data as RoadmapItem[]) || []);
     } catch (err) {
       console.error('대시보드 데이터 로딩 실패:', err);
     } finally {
@@ -185,26 +225,47 @@ export default function Home() {
   // 팀별 필터
   const teamPlans = yearlyPlans.filter((p) => p.team === effectiveTeam);
   const teamGoals = monthlyGoals.filter((g) => g.team === effectiveTeam);
-  const teamObjectives = objectives.filter((o) => o.team === effectiveTeam);
 
-  // 팀 OKR 평균 진행률
+  // 개인 OKR: RLS에 의해 본인+admin/leader만 보임. admin/leader가 전체 볼 때는 effectiveTeam으로 필터.
+  const myObjectives = useMemo(
+    () => objectives.filter((o) => o.user_id === myProfile?.id),
+    [objectives, myProfile?.id]
+  );
+  const teamObjectives = useMemo(
+    () => teamObjectivesData.filter((o) => o.team === effectiveTeam),
+    [teamObjectivesData, effectiveTeam]
+  );
+
+  const teamRoadmaps = useMemo(
+    () => roadmapItems.filter((r) => r.team === effectiveTeam),
+    [roadmapItems, effectiveTeam]
+  );
+
+  function krProgress(krs: Array<{ status: string; type: string; target_value: number | null; current_value: number | null }>): number {
+    if (krs.length === 0) return 0;
+    let sum = 0;
+    for (const kr of krs) {
+      if (kr.status === '완료') { sum += 100; continue; }
+      if (kr.type === 'numeric' && kr.target_value && kr.target_value > 0) {
+        sum += Math.min(((kr.current_value || 0) / kr.target_value) * 100, 100);
+      }
+    }
+    return sum / krs.length;
+  }
+
+  // 팀 OKR 평균 진행률 (팀 OKR 전용 테이블 기반)
   const teamOkrAvg = useMemo(() => {
     if (teamObjectives.length === 0) return 0;
-    let total = 0;
-    for (const obj of teamObjectives) {
-      const krs = obj.okr_key_results || [];
-      if (krs.length === 0) continue;
-      let sum = 0;
-      for (const kr of krs) {
-        if (kr.status === '완료') { sum += 100; continue; }
-        if (kr.type === 'numeric' && kr.target_value && kr.target_value > 0) {
-          sum += Math.min(((kr.current_value || 0) / kr.target_value) * 100, 100);
-        }
-      }
-      total += sum / krs.length;
-    }
+    const total = teamObjectives.reduce((acc, obj) => acc + krProgress(obj.team_key_results || []), 0);
     return total / teamObjectives.length;
   }, [teamObjectives]);
+
+  // 내 OKR 평균 진행률
+  const myOkrAvg = useMemo(() => {
+    if (myObjectives.length === 0) return 0;
+    const total = myObjectives.reduce((acc, obj) => acc + krProgress(obj.okr_key_results || []), 0);
+    return total / myObjectives.length;
+  }, [myObjectives]);
 
   // 병원 임박 일정
   const urgentHospitalTasks = useMemo(() => {
@@ -345,37 +406,30 @@ export default function Home() {
           </div>
         )}
 
-        {/* 공통: 팀 OKR */}
+        {/* 내 OKR */}
         <div className="rounded-lg bg-white shadow-sm border border-gray-100">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Target className="h-5 w-5 text-blue-500" /> {effectiveTeam} OKR
+              <User className="h-5 w-5 text-emerald-500" /> 내 OKR
             </h2>
             <Link href="/kpi" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
               전체 <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="p-6">
-            {teamObjectives.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">진행 중인 OKR이 없습니다</p>
+            {myObjectives.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">진행 중인 내 OKR이 없습니다</p>
             ) : (
               <div className="space-y-3">
                 <div className="flex items-baseline gap-2">
-                  <span className={`text-3xl font-bold ${teamOkrAvg >= 70 ? 'text-green-600' : teamOkrAvg >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
-                    {teamOkrAvg.toFixed(0)}%
+                  <span className={`text-3xl font-bold ${myOkrAvg >= 70 ? 'text-green-600' : myOkrAvg >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {myOkrAvg.toFixed(0)}%
                   </span>
-                  <span className="text-sm text-gray-500">팀 평균 달성률</span>
+                  <span className="text-sm text-gray-500">평균 달성률</span>
                 </div>
                 <div className="space-y-1.5">
-                  {teamObjectives.slice(0, 3).map((obj) => {
-                    const krs = obj.okr_key_results || [];
-                    const progress = krs.length === 0 ? 0 : krs.reduce((sum, kr) => {
-                      if (kr.status === '완료') return sum + 100;
-                      if (kr.type === 'numeric' && kr.target_value && kr.target_value > 0) {
-                        return sum + Math.min(((kr.current_value || 0) / kr.target_value) * 100, 100);
-                      }
-                      return sum;
-                    }, 0) / krs.length;
+                  {myObjectives.slice(0, 3).map((obj) => {
+                    const progress = krProgress(obj.okr_key_results || []);
                     return (
                       <div key={obj.id} className="flex items-center gap-3 text-sm">
                         <p className="flex-1 min-w-0 truncate text-gray-700">{obj.title}</p>
@@ -388,6 +442,111 @@ export default function Home() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 팀 OKR */}
+        <div className="rounded-lg bg-white shadow-sm border border-gray-100">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Target className="h-5 w-5 text-blue-500" /> {effectiveTeam} OKR
+            </h2>
+            <Link href="/kpi" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              전체 <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="p-6">
+            {teamObjectives.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">진행 중인 팀 OKR이 없습니다</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-3xl font-bold ${teamOkrAvg >= 70 ? 'text-green-600' : teamOkrAvg >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {teamOkrAvg.toFixed(0)}%
+                  </span>
+                  <span className="text-sm text-gray-500">팀 평균 달성률</span>
+                </div>
+                <div className="space-y-1.5">
+                  {teamObjectives.slice(0, 3).map((obj) => {
+                    const progress = krProgress(obj.team_key_results || []);
+                    return (
+                      <div key={obj.id} className="flex items-center gap-3 text-sm">
+                        <p className="flex-1 min-w-0 truncate text-gray-700">{obj.title}</p>
+                        <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${progress >= 70 ? 'bg-green-500' : progress >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                            style={{ width: `${Math.min(progress, 100)}%` }} />
+                        </div>
+                        <span className="text-xs font-medium text-gray-500 w-10 text-right">{progress.toFixed(0)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 팀 로드맵 미니 캘린더 */}
+        <div className="rounded-lg bg-white shadow-sm border border-gray-100 lg:col-span-2">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-indigo-500" /> {effectiveTeam} 캘린더
+              <span className="text-xs font-normal text-gray-400">· {month}월</span>
+            </h2>
+            <Link href="/calendar" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              전체 <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="p-4">
+            <MiniCalendar roadmaps={teamRoadmaps} year={year} month={month} />
+          </div>
+        </div>
+
+        {/* 팀 로드맵 임박 리스트 */}
+        <div className="rounded-lg bg-white shadow-sm border border-gray-100 lg:col-span-2">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-indigo-500" /> 임박·진행 로드맵
+              <span className="text-xs font-normal text-gray-400">· 상세 리스트</span>
+            </h2>
+          </div>
+          <div className="p-6">
+            {teamRoadmaps.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">진행 중인 로드맵이 없습니다</p>
+            ) : (
+              <div className="space-y-2">
+                {teamRoadmaps.slice(0, 6).map((r) => {
+                  const isSingleDay = r.start_date === r.end_date;
+                  const d = daysUntil(r.end_date);
+                  return (
+                    <div key={r.id} className="flex items-center gap-3 text-sm">
+                      <div className={`h-2 w-2 rounded-full flex-shrink-0 ${COLOR_BAR[r.color] || 'bg-blue-500'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {isSingleDay ? `당일 · ${r.start_date}` : `${r.start_date} ~ ${r.end_date}`}
+                          {r.assignee && ` · ${r.assignee.display_name || r.assignee.email}`}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0 ${
+                        isSingleDay ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-50 text-gray-600'
+                      }`}>
+                        {isSingleDay ? '당일' : '기간'}
+                      </span>
+                      {d !== null && d <= 7 && (
+                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
+                          d < 0 ? 'text-red-700 bg-red-50 border-red-200'
+                            : d <= 3 ? 'text-red-700 bg-red-50 border-red-200'
+                            : 'text-yellow-700 bg-yellow-50 border-yellow-200'
+                        }`}>
+                          {d < 0 ? `D+${-d}` : d === 0 ? 'D-DAY' : `D-${d}`}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -517,6 +676,83 @@ export default function Home() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function MiniCalendar({ roadmaps, year, month }: { roadmaps: RoadmapItem[]; year: number; month: number }) {
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const firstDow = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+  const todayDate = today.getDate();
+
+  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+  const cells = Array.from({ length: totalCells }, (_, i) => {
+    const dayNum = i - firstDow + 1;
+    return dayNum >= 1 && dayNum <= daysInMonth ? dayNum : null;
+  });
+
+  function roadmapsForDay(dayNum: number): RoadmapItem[] {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    return roadmaps.filter((r) => dateStr >= r.start_date && dateStr <= r.end_date);
+  }
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
+          <div key={d} className={`text-center text-[11px] font-semibold py-1 ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((dayNum, i) => {
+          if (dayNum === null) {
+            return <div key={i} className="min-h-12 rounded" />;
+          }
+          const items = roadmapsForDay(dayNum);
+          const isToday = isCurrentMonth && dayNum === todayDate;
+          const dow = i % 7;
+          return (
+            <div
+              key={i}
+              className={`min-h-12 rounded border p-1 overflow-hidden ${
+                isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-gray-50/40'
+              }`}
+            >
+              <div className={`text-[10px] font-medium ${
+                isToday ? 'text-blue-600' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-600'
+              }`}>
+                {dayNum}
+              </div>
+              <div className="mt-0.5 space-y-0.5">
+                {items.slice(0, 2).map((r) => {
+                  const isSingle = r.start_date === r.end_date;
+                  return (
+                    <div
+                      key={r.id}
+                      title={r.title}
+                      className={`h-1 rounded-full ${COLOR_BAR[r.color] || 'bg-blue-500'} ${isSingle ? 'w-1.5' : ''}`}
+                    />
+                  );
+                })}
+                {items.length > 2 && (
+                  <div className="text-[9px] text-gray-400 leading-none">+{items.length - 2}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
+        <span>━ 기간</span>
+        <span>● 당일</span>
+        <span className="ml-auto">로드맵만 표시 · 전체는 캘린더 페이지에서</span>
       </div>
     </div>
   );

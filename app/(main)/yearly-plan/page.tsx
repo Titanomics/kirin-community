@@ -47,14 +47,12 @@ const STATUS_COLOR: Record<string, string> = {
   '보류': 'bg-yellow-100 text-yellow-700',
 };
 
-const TEAMS = ['커머스팀', '콘텐츠팀'] as const;
-
 export default function YearlyPlanPage() {
   const supabase = createClient();
   const { profile } = useAuth();
 
   const [year, setYear] = useState(new Date().getFullYear());
-  const [team, setTeam] = useState<string>(profile?.team === '콘텐츠팀' ? '콘텐츠팀' : '커머스팀');
+  const team = '커머스팀';
   const [plans, setPlans] = useState<YearlyPlan[]>([]);
   const [goals, setGoals] = useState<MonthlyGoal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,10 +79,21 @@ export default function YearlyPlanPage() {
   const [saving, setSaving] = useState(false);
   const canEdit = !!profile;
   const isAdmin = profile?.role === 'admin';
+  const hasAccess = isAdmin || profile?.team === '커머스팀';
 
   useEffect(() => {
+    if (!hasAccess) return;
     fetchData();
-  }, [year, team]);
+  }, [year, team, hasAccess]);
+
+  if (profile && !hasAccess) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 text-gray-500">
+        <p className="text-lg font-semibold">접근 권한이 없습니다</p>
+        <p className="text-sm">연간 플랜은 커머스팀 전용 페이지입니다</p>
+      </div>
+    );
+  }
 
   async function fetchData() {
     setLoading(true);
@@ -216,16 +225,6 @@ export default function YearlyPlanPage() {
           <p className="mt-1 text-sm text-gray-600">{team}의 연간 로드맵과 월별 목표를 관리하세요</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {isAdmin && (
-            <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
-              {TEAMS.map((t) => (
-                <button key={t} onClick={() => setTeam(t)}
-                  className={`rounded px-3 py-1.5 text-sm font-medium transition ${team === t ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="flex items-center gap-1 rounded-lg bg-white border border-gray-200 px-1.5 py-0.5">
             <button onClick={() => setYear(year - 1)} className="p-1 text-gray-400 hover:text-gray-700"><ChevronLeft className="h-4 w-4" /></button>
             <span className="px-2 text-sm font-semibold text-gray-900">{year}년</span>
