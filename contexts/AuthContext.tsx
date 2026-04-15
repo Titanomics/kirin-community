@@ -9,6 +9,7 @@ interface UserProfile {
   email: string | null;
   display_name: string | null;
   role: 'admin' | 'user' | 'leader';
+  team: '커머스팀' | '콘텐츠팀' | null;
   joined_at: string | null;
   leave_total_override: number | null;
   resigned_at: string | null;

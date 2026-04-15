@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Clock, UserCheck, X } from 'lucide-react';
+import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Clock, UserCheck, X, Target, Building2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { useMemo, useEffect, useState } from 'react';
@@ -58,6 +58,15 @@ export default function Sidebar() {
     items.push({ name: 'OKR', href: '/kpi', icon: BarChart3 });
     items.push({ name: '출퇴근', href: '/attendance', icon: Clock });
 
+    // 팀별 전용 메뉴
+    const userTeam = profile?.team;
+    if (isAdmin || userTeam === '커머스팀') {
+      items.push({ name: '연간 플랜', href: '/yearly-plan', icon: Target });
+    }
+    if (isAdmin || userTeam === '콘텐츠팀') {
+      items.push({ name: '병원 관리', href: '/hospitals', icon: Building2 });
+    }
+
     if (isAdmin) {
       items.push({ name: '인원 관리', href: '/employees', icon: Users });
       items.push({ name: '출석 관리', href: '/attendance-admin', icon: UserCheck });
@@ -67,7 +76,7 @@ export default function Sidebar() {
     }
 
     return items;
-  }, [isAdmin, isLeader]);
+  }, [isAdmin, isLeader, profile?.team]);
 
   const displayName =
     profile?.display_name ||
