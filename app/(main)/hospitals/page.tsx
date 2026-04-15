@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { Plus, X, Trash2, Pencil, Building2, Calendar, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
+import { Plus, X, Trash2, Pencil, Building2, Calendar, AlertTriangle, Clock, CheckCircle2, Settings, GripVertical } from 'lucide-react';
 
 interface Hospital {
   id: string;
@@ -34,29 +34,29 @@ interface Profile {
   team: string | null;
 }
 
-const CHANNELS = [
-  { key: 'naver_place', label: '네이버플레이스' },
-  { key: 'blog', label: '블로그' },
-  { key: 'homepage', label: '홈페이지' },
-  { key: 'youtube_long', label: '유튜브롱폼' },
-  { key: 'youtube_short', label: '유튜브숏폼' },
-  { key: 'tiktok', label: '틱톡' },
-  { key: 'threads', label: '쓰레드' },
-  { key: 'mso', label: 'MSO' },
+interface HospitalSetting {
+  id: string;
+  category: 'channel' | 'type' | 'status';
+  key: string;
+  label: string;
+  color: string;
+  sort_order: number;
+}
+
+const COLOR_OPTIONS = [
+  { key: 'gray', label: '회색', chip: 'bg-gray-100 text-gray-700' },
+  { key: 'blue', label: '파랑', chip: 'bg-blue-100 text-blue-700' },
+  { key: 'green', label: '초록', chip: 'bg-green-100 text-green-700' },
+  { key: 'purple', label: '보라', chip: 'bg-purple-100 text-purple-700' },
+  { key: 'orange', label: '주황', chip: 'bg-orange-100 text-orange-700' },
+  { key: 'pink', label: '분홍', chip: 'bg-pink-100 text-pink-700' },
+  { key: 'red', label: '빨강', chip: 'bg-red-100 text-red-700' },
+  { key: 'yellow', label: '노랑', chip: 'bg-yellow-100 text-yellow-700' },
 ];
 
-const TYPE_COLORS: Record<string, string> = {
-  '촬영': 'bg-purple-100 text-purple-700',
-  '업로드': 'bg-blue-100 text-blue-700',
-  '배너': 'bg-orange-100 text-orange-700',
-  '기타': 'bg-gray-100 text-gray-700',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  '대기': 'bg-gray-100 text-gray-600',
-  '진행중': 'bg-blue-100 text-blue-700',
-  '완료': 'bg-green-100 text-green-700',
-};
+function colorChip(color: string): string {
+  return COLOR_OPTIONS.find((c) => c.key === color)?.chip || COLOR_OPTIONS[0].chip;
+}
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -82,7 +82,9 @@ export default function HospitalsPage() {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [tasks, setTasks] = useState<HospitalTask[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [settings, setSettings] = useState<HospitalSetting[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState('active'); // active / all / done
   const [filterMine, setFilterMine] = useState(false);
@@ -122,15 +124,28 @@ export default function HospitalsPage() {
 
   async function fetchData() {
     setLoading(true);
-    const [hospitalsRes, tasksRes, profilesRes] = await Promise.all([
+    const [hospitalsRes, tasksRes, profilesRes, settingsRes] = await Promise.all([
       supabase.from('hospitals').select('*').order('name'),
       supabase.from('hospital_tasks').select('*').order('due_date', { ascending: true, nullsFirst: false }),
       supabase.from('profiles').select('id, display_name, email, team').is('resigned_at', null).order('display_name'),
+      supabase.from('hospital_settings').select('*').order('sort_order'),
     ]);
     setHospitals(hospitalsRes.data || []);
     setTasks(tasksRes.data || []);
     setProfiles(profilesRes.data || []);
+    setSettings((settingsRes.data as HospitalSetting[]) || []);
     setLoading(false);
+  }
+
+  // 카테고리별 설정 헬퍼
+  const channels = useMemo(() => settings.filter((s) => s.category === 'channel'), [settings]);
+  const types = useMemo(() => settings.filter((s) => s.category === 'type'), [settings]);
+  const statuses = useMemo(() => settings.filter((s) => s.category === 'status'), [settings]);
+  function typeColor(type: string): string {
+    return colorChip(types.find((t) => t.key === type)?.color || 'gray');
+  }
+  function statusColor(status: string): string {
+    return colorChip(statuses.find((s) => s.key === status)?.color || 'gray');
   }
 
   // ----- 병원 CRUD -----
@@ -241,6 +256,41 @@ export default function HospitalsPage() {
     await fetchData();
   }
 
+  // ----- 설정 CRUD -----
+  async function addSetting(category: 'channel' | 'type' | 'status', label: string, color: string) {
+    if (!label.trim()) return;
+    const key = label.trim();
+    const existing = settings.find((s) => s.category === category && s.key === key);
+    if (existing) { alert('이미 동일한 항목이 있습니다'); return; }
+    const maxOrder = Math.max(0, ...settings.filter((s) => s.category === category).map((s) => s.sort_order));
+    const { error } = await supabase.from('hospital_settings').insert({
+      category, key, label, color, sort_order: maxOrder + 1,
+    });
+    if (error) alert('추가 실패: ' + error.message);
+    else await fetchData();
+  }
+  async function updateSetting(id: string, patch: Partial<Pick<HospitalSetting, 'label' | 'color'>>) {
+    const { error } = await supabase.from('hospital_settings').update(patch).eq('id', id);
+    if (error) alert('수정 실패: ' + error.message);
+    else await fetchData();
+  }
+  async function deleteSetting(s: HospitalSetting) {
+    // 사용 여부 확인
+    let inUse = 0;
+    if (s.category === 'channel') {
+      inUse = hospitals.filter((h) => h.channels?.[s.key]).length;
+    } else if (s.category === 'type') {
+      inUse = tasks.filter((t) => t.type === s.key).length;
+    } else {
+      inUse = tasks.filter((t) => t.status === s.key).length;
+    }
+    const warn = inUse > 0 ? `\n\n⚠️ ${inUse}개 항목에서 사용 중입니다. 삭제해도 기존 기록은 남지만, 선택 목록에서는 제거됩니다.` : '';
+    if (!confirm(`'${s.label}' 을(를) 삭제하시겠습니까?${warn}`)) return;
+    const { error } = await supabase.from('hospital_settings').delete().eq('id', s.id);
+    if (error) alert('삭제 실패: ' + error.message);
+    else await fetchData();
+  }
+
   // ----- 필터링 -----
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -274,6 +324,11 @@ export default function HospitalsPage() {
         </div>
         {canEdit && (
           <div className="flex gap-2">
+            <button onClick={() => setShowSettingsModal(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 text-gray-600 px-3 py-2 text-sm font-medium hover:bg-gray-50"
+              title="채널/유형/상태 관리">
+              <Settings className="h-4 w-4" /> 설정
+            </button>
             <button onClick={openHospitalAdd} className="flex items-center gap-1.5 rounded-lg border border-blue-600 text-blue-600 px-3 py-2 text-sm font-medium hover:bg-blue-50">
               <Plus className="h-4 w-4" /> 병원
             </button>
@@ -352,11 +407,11 @@ export default function HospitalsPage() {
                             {assignee?.display_name || '담당 미지정'} · {hTasks.length}건
                           </p>
                           <div className="mt-1.5 flex flex-wrap gap-1">
-                            {CHANNELS.filter((c) => h.channels?.[c.key]).slice(0, 4).map((c) => (
+                            {channels.filter((c) => h.channels?.[c.key]).slice(0, 4).map((c) => (
                               <span key={c.key} className="text-[10px] rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{c.label}</span>
                             ))}
-                            {CHANNELS.filter((c) => h.channels?.[c.key]).length > 4 && (
-                              <span className="text-[10px] text-gray-400">+{CHANNELS.filter((c) => h.channels?.[c.key]).length - 4}</span>
+                            {channels.filter((c) => h.channels?.[c.key]).length > 4 && (
+                              <span className="text-[10px] text-gray-400">+{channels.filter((c) => h.channels?.[c.key]).length - 4}</span>
                             )}
                           </div>
                         </div>
@@ -422,7 +477,7 @@ export default function HospitalsPage() {
                   <div className="mt-3">
                     <p className="text-xs font-medium text-gray-500 mb-1.5">운영 채널</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {CHANNELS.map((c) => (
+                      {channels.map((c) => (
                         <span key={c.key}
                           className={`text-xs rounded px-2 py-0.5 border ${
                             h.channels?.[c.key]
@@ -462,11 +517,11 @@ export default function HospitalsPage() {
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${TYPE_COLORS[t.type] || TYPE_COLORS['기타']}`}>
-                              {t.type}
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${typeColor(t.type)}`}>
+                              {types.find((x) => x.key === t.type)?.label || t.type}
                             </span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_COLORS[t.status]}`}>
-                              {t.status}
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${statusColor(t.status)}`}>
+                              {statuses.find((x) => x.key === t.status)?.label || t.status}
                             </span>
                             {dlabel && (
                               <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${dlabel.color}`}>
@@ -528,19 +583,27 @@ export default function HospitalsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">운영 채널</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {CHANNELS.map((c) => (
-                    <label key={c.key} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${
-                      hospitalForm.channels[c.key] ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'
-                    }`}>
-                      <input type="checkbox" checked={hospitalForm.channels[c.key] || false}
-                        onChange={(e) => setHospitalForm({ ...hospitalForm, channels: { ...hospitalForm.channels, [c.key]: e.target.checked } })}
-                        className="hidden" />
-                      <span className="text-sm">{c.label}</span>
-                    </label>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">운영 채널</label>
+                  <button type="button" onClick={() => setShowSettingsModal(true)}
+                    className="text-xs text-blue-600 hover:text-blue-700">+ 채널 관리</button>
                 </div>
+                {channels.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-2">등록된 채널이 없습니다. "채널 관리"에서 추가하세요.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {channels.map((c) => (
+                      <label key={c.key} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${
+                        hospitalForm.channels[c.key] ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'
+                      }`}>
+                        <input type="checkbox" checked={hospitalForm.channels[c.key] || false}
+                          onChange={(e) => setHospitalForm({ ...hospitalForm, channels: { ...hospitalForm.channels, [c.key]: e.target.checked } })}
+                          className="hidden" />
+                        <span className="text-sm">{c.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">비고 (집중 포인트 등)</label>
@@ -578,22 +641,23 @@ export default function HospitalsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">유형</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">유형</label>
+                    <button type="button" onClick={() => setShowSettingsModal(true)} className="text-[11px] text-blue-600 hover:text-blue-700">+ 관리</button>
+                  </div>
                   <select value={taskForm.type} onChange={(e) => setTaskForm({ ...taskForm, type: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                    <option value="촬영">촬영</option>
-                    <option value="업로드">업로드</option>
-                    <option value="배너">배너/공지</option>
-                    <option value="기타">기타</option>
+                    {types.map((t) => <option key={t.id} value={t.key}>{t.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">상태</label>
+                    <button type="button" onClick={() => setShowSettingsModal(true)} className="text-[11px] text-blue-600 hover:text-blue-700">+ 관리</button>
+                  </div>
                   <select value={taskForm.status} onChange={(e) => setTaskForm({ ...taskForm, status: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                    <option value="대기">대기</option>
-                    <option value="진행중">진행중</option>
-                    <option value="완료">완료</option>
+                    {statuses.map((s) => <option key={s.id} value={s.key}>{s.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -603,14 +667,12 @@ export default function HospitalsPage() {
                   placeholder="예: 원장님 인터뷰 촬영 / 설 연휴 배너 삭제"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
               </div>
-              {taskForm.type === '배너' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">플랫폼</label>
-                  <input type="text" value={taskForm.platform} onChange={(e) => setTaskForm({ ...taskForm, platform: e.target.value })}
-                    placeholder="예: 네이버 플레이스, 홈페이지, 블로그"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">플랫폼 (선택)</label>
+                <input type="text" value={taskForm.platform} onChange={(e) => setTaskForm({ ...taskForm, platform: e.target.value })}
+                  placeholder="예: 네이버 플레이스, 홈페이지, 블로그"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
@@ -650,6 +712,145 @@ export default function HospitalsPage() {
           </div>
         </div>
       )}
+
+      {/* 설정 모달 (채널/유형/상태 관리) */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">항목 관리</h3>
+                <p className="text-xs text-gray-500 mt-0.5">운영 채널, 일정 유형, 상태를 직접 추가/수정/삭제할 수 있습니다</p>
+              </div>
+              <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="overflow-y-auto p-6 space-y-6">
+              <SettingsSection
+                title="운영 채널"
+                description="병원별로 체크할 수 있는 마케팅 채널 목록"
+                items={channels}
+                onAdd={(label, color) => addSetting('channel', label, color)}
+                onUpdate={updateSetting}
+                onDelete={deleteSetting}
+              />
+              <SettingsSection
+                title="일정 유형"
+                description="일정의 분류 (촬영/업로드/배너 등)"
+                items={types}
+                onAdd={(label, color) => addSetting('type', label, color)}
+                onUpdate={updateSetting}
+                onDelete={deleteSetting}
+              />
+              <SettingsSection
+                title="일정 상태"
+                description="일정의 진행 단계 (대기/진행중/완료 등)"
+                items={statuses}
+                onAdd={(label, color) => addSetting('status', label, color)}
+                onUpdate={updateSetting}
+                onDelete={deleteSetting}
+              />
+            </div>
+            <div className="flex justify-end px-6 py-4 border-t border-gray-100 flex-shrink-0">
+              <button onClick={() => setShowSettingsModal(false)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ----- 설정 섹션 서브 컴포넌트 -----
+function SettingsSection({
+  title,
+  description,
+  items,
+  onAdd,
+  onUpdate,
+  onDelete,
+}: {
+  title: string;
+  description: string;
+  items: HospitalSetting[];
+  onAdd: (label: string, color: string) => void | Promise<void>;
+  onUpdate: (id: string, patch: Partial<Pick<HospitalSetting, 'label' | 'color'>>) => void | Promise<void>;
+  onDelete: (s: HospitalSetting) => void | Promise<void>;
+}) {
+  const [newLabel, setNewLabel] = useState('');
+  const [newColor, setNewColor] = useState('gray');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const [editColor, setEditColor] = useState('gray');
+
+  function startEdit(s: HospitalSetting) {
+    setEditingId(s.id);
+    setEditLabel(s.label);
+    setEditColor(s.color);
+  }
+  async function saveEdit() {
+    if (!editingId) return;
+    await onUpdate(editingId, { label: editLabel, color: editColor });
+    setEditingId(null);
+  }
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
+      <p className="text-xs text-gray-500 mt-0.5 mb-2">{description}</p>
+      <div className="space-y-1.5">
+        {items.length === 0 && (
+          <p className="text-xs text-gray-400 py-2">등록된 항목이 없습니다</p>
+        )}
+        {items.map((s) => (
+          <div key={s.id} className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50/50 px-2 py-1.5">
+            <GripVertical className="h-4 w-4 text-gray-300 flex-shrink-0" />
+            {editingId === s.id ? (
+              <>
+                <input type="text" value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                  autoFocus
+                  className="flex-1 rounded border border-blue-400 px-2 py-1 text-sm focus:outline-none" />
+                <select value={editColor} onChange={(e) => setEditColor(e.target.value)}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs">
+                  {COLOR_OPTIONS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+                <button onClick={saveEdit} className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700">저장</button>
+                <button onClick={() => setEditingId(null)} className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-300">취소</button>
+              </>
+            ) : (
+              <>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorChip(s.color)}`}>{s.label}</span>
+                <span className="flex-1 text-xs text-gray-400">key: {s.key}</span>
+                <button onClick={() => startEdit(s)} className="p-1 text-gray-400 hover:text-blue-600">
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={() => onDelete(s)} className="p-1 text-gray-400 hover:text-red-600">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        ))}
+        {/* 추가 입력 행 */}
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-200 px-2 py-1.5">
+          <Plus className="h-4 w-4 text-gray-300 flex-shrink-0" />
+          <input type="text" value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && newLabel) { onAdd(newLabel, newColor); setNewLabel(''); } }}
+            placeholder="새 항목 추가 (Enter)"
+            className="flex-1 bg-transparent px-2 py-1 text-sm placeholder-gray-400 focus:outline-none" />
+          <select value={newColor} onChange={(e) => setNewColor(e.target.value)}
+            className="rounded border border-gray-200 px-2 py-1 text-xs">
+            {COLOR_OPTIONS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+          <button onClick={() => { if (newLabel) { onAdd(newLabel, newColor); setNewLabel(''); } }}
+            disabled={!newLabel}
+            className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-40">
+            추가
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
