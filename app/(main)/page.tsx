@@ -488,70 +488,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 팀 로드맵 미니 캘린더 */}
-        <div className="rounded-lg bg-white shadow-sm border border-gray-100 lg:col-span-2">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-indigo-500" /> {effectiveTeam} 캘린더
-              <span className="text-xs font-normal text-gray-400">· {month}월</span>
-            </h2>
-            <Link href="/calendar" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
-              전체 <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="p-4">
-            <MiniCalendar roadmaps={teamRoadmaps} year={year} month={month} />
-          </div>
-        </div>
-
-        {/* 팀 로드맵 임박 리스트 */}
-        <div className="rounded-lg bg-white shadow-sm border border-gray-100 lg:col-span-2">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-indigo-500" /> 임박·진행 로드맵
-              <span className="text-xs font-normal text-gray-400">· 상세 리스트</span>
-            </h2>
-          </div>
-          <div className="p-6">
-            {teamRoadmaps.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">진행 중인 로드맵이 없습니다</p>
-            ) : (
-              <div className="space-y-2">
-                {teamRoadmaps.slice(0, 6).map((r) => {
-                  const isSingleDay = r.start_date === r.end_date;
-                  const d = daysUntil(r.end_date);
-                  return (
-                    <div key={r.id} className="flex items-center gap-3 text-sm">
-                      <div className={`h-2 w-2 rounded-full flex-shrink-0 ${COLOR_BAR[r.color] || 'bg-blue-500'}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {isSingleDay ? `당일 · ${r.start_date}` : `${r.start_date} ~ ${r.end_date}`}
-                          {r.assignee && ` · ${r.assignee.display_name || r.assignee.email}`}
-                        </p>
-                      </div>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0 ${
-                        isSingleDay ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-50 text-gray-600'
-                      }`}>
-                        {isSingleDay ? '당일' : '기간'}
-                      </span>
-                      {d !== null && d <= 7 && (
-                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
-                          d < 0 ? 'text-red-700 bg-red-50 border-red-200'
-                            : d <= 3 ? 'text-red-700 bg-red-50 border-red-200'
-                            : 'text-yellow-700 bg-yellow-50 border-yellow-200'
-                        }`}>
-                          {d < 0 ? `D+${-d}` : d === 0 ? 'D-DAY' : `D-${d}`}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* 이번 달 목표 */}
         <div className="rounded-lg bg-white shadow-sm border border-gray-100">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -676,6 +612,70 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* 팀 로드맵 미니 캘린더 (팀 전용 위젯 아래) */}
+        <div className="rounded-lg bg-white shadow-sm border border-gray-100 lg:col-span-2">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-indigo-500" /> {effectiveTeam} 캘린더
+              <span className="text-xs font-normal text-gray-400">· {month}월</span>
+            </h2>
+            <Link href="/calendar" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              전체 <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="p-4">
+            <MiniCalendar roadmaps={teamRoadmaps} year={year} month={month} />
+          </div>
+        </div>
+
+        {/* 팀 로드맵 임박·진행 리스트 */}
+        <div className="rounded-lg bg-white shadow-sm border border-gray-100 lg:col-span-2">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-indigo-500" /> 임박·진행 로드맵
+              <span className="text-xs font-normal text-gray-400">· 상세 리스트</span>
+            </h2>
+          </div>
+          <div className="p-6">
+            {teamRoadmaps.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">진행 중인 로드맵이 없습니다</p>
+            ) : (
+              <div className="space-y-2">
+                {teamRoadmaps.slice(0, 6).map((r) => {
+                  const isSingleDay = r.start_date === r.end_date;
+                  const d = daysUntil(r.end_date);
+                  return (
+                    <div key={r.id} className="flex items-center gap-3 text-sm">
+                      <div className={`h-2 w-2 rounded-full flex-shrink-0 ${COLOR_BAR[r.color] || 'bg-blue-500'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {isSingleDay ? `당일 · ${r.start_date}` : `${r.start_date} ~ ${r.end_date}`}
+                          {r.assignee && ` · ${r.assignee.display_name || r.assignee.email}`}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium flex-shrink-0 ${
+                        isSingleDay ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-50 text-gray-600'
+                      }`}>
+                        {isSingleDay ? '당일' : '기간'}
+                      </span>
+                      {d !== null && d <= 7 && (
+                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
+                          d < 0 ? 'text-red-700 bg-red-50 border-red-200'
+                            : d <= 3 ? 'text-red-700 bg-red-50 border-red-200'
+                            : 'text-yellow-700 bg-yellow-50 border-yellow-200'
+                        }`}>
+                          {d < 0 ? `D+${-d}` : d === 0 ? 'D-DAY' : `D-${d}`}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
