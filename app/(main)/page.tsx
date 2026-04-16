@@ -53,6 +53,7 @@ interface HospitalTask {
   hospital_id: string;
   title: string;
   type: string;
+  start_date: string | null;
   due_date: string | null;
   status: string;
   assignee_id: string | null;
@@ -169,7 +170,12 @@ export default function Home() {
           .order('created_at', { ascending: false }),
         supabase.from('yearly_plans').select('*').eq('year', year),
         supabase.from('monthly_goals').select('*').eq('year', year).eq('month', month),
-        supabase.from('hospital_tasks').select('*').neq('status', '완료').order('due_date', { ascending: true, nullsFirst: false }).limit(20),
+        supabase
+          .from('hospital_tasks')
+          .select('*')
+          .neq('status', '완료')
+          .order('due_date', { ascending: true, nullsFirst: false })
+          .limit(100),
         supabase.from('hospitals').select('id, name'),
         supabase.from('okr_objectives').select('*, okr_key_results(status, type, target_value, current_value)').eq('status', '진행중'),
         supabase.from('team_objectives').select('*, team_key_results(status, type, target_value, current_value)').eq('status', '진행중'),
@@ -723,22 +729,31 @@ function MiniCalendar({ roadmaps, hospitalTasks, year, month }: { roadmaps: Road
         prefix: r.start_date === r.end_date ? '●' : '▬',
       }));
     const ht = hospitalTasks
-      .filter((t) => t.due_date === dateStr)
-      .map((t) => ({
-        key: `ht-${t.id}`,
-        chipClass:
-          t.type === '배너' ? 'bg-orange-100 text-orange-800' :
-          t.type === '촬영' ? 'bg-purple-100 text-purple-800' :
-          t.type === '업로드' ? 'bg-blue-100 text-blue-800' :
-          'bg-gray-100 text-gray-700',
-        barColor:
-          t.type === '배너' ? 'bg-orange-500' :
-          t.type === '촬영' ? 'bg-purple-500' :
-          t.type === '업로드' ? 'bg-blue-500' : 'bg-gray-500',
-        isSingle: true,
-        title: t.title,
-        prefix: '🏥',
-      }));
+      .filter((t) => {
+        const s = t.start_date || t.due_date;
+        const e = t.due_date || t.start_date;
+        return s && e && dateStr >= s && dateStr <= e;
+      })
+      .map((t) => {
+        const s = t.start_date || t.due_date!;
+        const e = t.due_date || t.start_date!;
+        const isSingle = s === e;
+        return {
+          key: `ht-${t.id}`,
+          chipClass:
+            t.type === '배너' ? 'bg-orange-100 text-orange-800' :
+            t.type === '촬영' ? 'bg-purple-100 text-purple-800' :
+            t.type === '업로드' ? 'bg-blue-100 text-blue-800' :
+            'bg-gray-100 text-gray-700',
+          barColor:
+            t.type === '배너' ? 'bg-orange-500' :
+            t.type === '촬영' ? 'bg-purple-500' :
+            t.type === '업로드' ? 'bg-blue-500' : 'bg-gray-500',
+          isSingle,
+          title: t.title,
+          prefix: '🏥',
+        };
+      });
     return [...rm, ...ht];
   }
 
