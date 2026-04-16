@@ -106,6 +106,19 @@ function daysUntil(dateStr: string | null): number | null {
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function ddayStyle(d: number): string {
+  if (d < 0) return 'text-white bg-red-600 border-red-600';
+  if (d === 0) return 'text-red-700 bg-red-100 border-red-300';
+  if (d <= 3) return 'text-red-700 bg-red-50 border-red-200';
+  if (d <= 7) return 'text-orange-700 bg-orange-50 border-orange-200';
+  if (d <= 14) return 'text-yellow-700 bg-yellow-50 border-yellow-200';
+  return 'text-gray-600 bg-gray-50 border-gray-200';
+}
+
+function ddayLabel(d: number): string {
+  return d < 0 ? `D+${-d}` : d === 0 ? 'D-DAY' : `D-${d}`;
+}
+
 export default function Home() {
   const { profile: myProfile } = useAuth();
   const supabase = createClient();
@@ -578,7 +591,6 @@ export default function Home() {
                 urgentHospitalTasks.map((t) => {
                   const hospital = hospitals.find((h) => h.id === t.hospital_id);
                   const d = daysUntil(t.due_date);
-                  const isUrgent = d !== null && d <= 3;
                   return (
                     <div key={t.id} className="flex items-center justify-between px-6 py-3">
                       <div className="flex items-center gap-3 min-w-0">
@@ -596,12 +608,8 @@ export default function Home() {
                         </div>
                       </div>
                       {d !== null && (
-                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
-                          d < 0 ? 'text-red-700 bg-red-50 border-red-200' :
-                          isUrgent ? 'text-red-700 bg-red-50 border-red-200' :
-                          'text-yellow-700 bg-yellow-50 border-yellow-200'
-                        }`}>
-                          {d < 0 ? `D+${-d}` : d === 0 ? 'D-DAY' : `D-${d}`}
+                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ${ddayStyle(d)}`}>
+                          {ddayLabel(d)}
                         </span>
                       )}
                     </div>
@@ -659,13 +667,9 @@ export default function Home() {
                       }`}>
                         {isSingleDay ? '당일' : '기간'}
                       </span>
-                      {d !== null && d <= 7 && (
-                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
-                          d < 0 ? 'text-red-700 bg-red-50 border-red-200'
-                            : d <= 3 ? 'text-red-700 bg-red-50 border-red-200'
-                            : 'text-yellow-700 bg-yellow-50 border-yellow-200'
-                        }`}>
-                          {d < 0 ? `D+${-d}` : d === 0 ? 'D-DAY' : `D-${d}`}
+                      {d !== null && (
+                        <span className={`rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ${ddayStyle(d)}`}>
+                          {ddayLabel(d)}
                         </span>
                       )}
                     </div>
