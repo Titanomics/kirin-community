@@ -269,10 +269,9 @@ export default function Home() {
 
   // 병원 임박 일정
   const urgentHospitalTasks = useMemo(() => {
-    return hospitalTasks.filter((t) => {
-      const d = daysUntil(t.due_date);
-      return d !== null && d <= 7;
-    }).slice(0, 8);
+    return hospitalTasks
+      .filter((t) => t.due_date !== null)
+      .slice(0, 8);
   }, [hospitalTasks]);
 
   const overdueCount = hospitalTasks.filter((t) => {
@@ -574,7 +573,7 @@ export default function Home() {
             </div>
             <div className="divide-y divide-gray-50">
               {urgentHospitalTasks.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-6">7일 내 임박한 일정이 없습니다</p>
+                <p className="text-sm text-gray-400 text-center py-6">예정된 병원 일정이 없습니다</p>
               ) : (
                 urgentHospitalTasks.map((t) => {
                   const hospital = hospitals.find((h) => h.id === t.hospital_id);
