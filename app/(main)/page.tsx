@@ -704,26 +704,40 @@ function MiniCalendar({ roadmaps, hospitalTasks, year, month }: { roadmaps: Road
     return dayNum >= 1 && dayNum <= daysInMonth ? dayNum : null;
   });
 
-  function itemsForDay(dayNum: number): Array<{ key: string; barClass: string; isSingle: boolean; title: string }> {
+  function itemsForDay(dayNum: number): Array<{ key: string; chipClass: string; barColor: string; isSingle: boolean; title: string; prefix: string }> {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     const rm = roadmaps
       .filter((r) => dateStr >= r.start_date && dateStr <= r.end_date)
       .map((r) => ({
         key: `rm-${r.id}`,
-        barClass: COLOR_BAR[r.color] || 'bg-blue-500',
+        chipClass:
+          r.color === 'green' ? 'bg-green-100 text-green-800' :
+          r.color === 'purple' ? 'bg-purple-100 text-purple-800' :
+          r.color === 'orange' ? 'bg-orange-100 text-orange-800' :
+          r.color === 'pink' ? 'bg-pink-100 text-pink-800' :
+          r.color === 'gray' ? 'bg-gray-100 text-gray-800' :
+          'bg-blue-100 text-blue-800',
+        barColor: COLOR_BAR[r.color] || 'bg-blue-500',
         isSingle: r.start_date === r.end_date,
         title: r.title,
+        prefix: r.start_date === r.end_date ? '●' : '▬',
       }));
     const ht = hospitalTasks
       .filter((t) => t.due_date === dateStr)
       .map((t) => ({
         key: `ht-${t.id}`,
-        barClass:
+        chipClass:
+          t.type === '배너' ? 'bg-orange-100 text-orange-800' :
+          t.type === '촬영' ? 'bg-purple-100 text-purple-800' :
+          t.type === '업로드' ? 'bg-blue-100 text-blue-800' :
+          'bg-gray-100 text-gray-700',
+        barColor:
           t.type === '배너' ? 'bg-orange-500' :
           t.type === '촬영' ? 'bg-purple-500' :
           t.type === '업로드' ? 'bg-blue-500' : 'bg-gray-500',
         isSingle: true,
-        title: `🏥 ${t.title}`,
+        title: t.title,
+        prefix: '🏥',
       }));
     return [...rm, ...ht];
   }
@@ -740,7 +754,7 @@ function MiniCalendar({ roadmaps, hospitalTasks, year, month }: { roadmaps: Road
       <div className="grid grid-cols-7 gap-1">
         {cells.map((dayNum, i) => {
           if (dayNum === null) {
-            return <div key={i} className="min-h-12 rounded" />;
+            return <div key={i} className="min-h-16 rounded" />;
           }
           const items = itemsForDay(dayNum);
           const isToday = isCurrentMonth && dayNum === todayDate;
@@ -748,35 +762,37 @@ function MiniCalendar({ roadmaps, hospitalTasks, year, month }: { roadmaps: Road
           return (
             <div
               key={i}
-              className={`min-h-12 rounded border p-1 overflow-hidden ${
+              className={`min-h-16 md:min-h-20 rounded border p-1 overflow-hidden ${
                 isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-gray-50/40'
               }`}
             >
-              <div className={`text-[10px] font-medium ${
+              <div className={`text-[11px] font-medium ${
                 isToday ? 'text-blue-600' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-600'
               }`}>
                 {dayNum}
               </div>
               <div className="mt-0.5 space-y-0.5">
-                {items.slice(0, 3).map((it) => (
+                {items.slice(0, 2).map((it) => (
                   <div
                     key={it.key}
                     title={it.title}
-                    className={`h-1 rounded-full ${it.barClass} ${it.isSingle ? 'w-1.5' : ''}`}
-                  />
+                    className={`rounded px-1 py-0.5 text-[10px] leading-tight truncate flex items-center gap-0.5 ${it.chipClass}`}
+                  >
+                    <span className="opacity-70 flex-shrink-0 text-[9px]">{it.prefix}</span>
+                    <span className="truncate">{it.title}</span>
+                  </div>
                 ))}
-                {items.length > 3 && (
-                  <div className="text-[9px] text-gray-400 leading-none">+{items.length - 3}</div>
+                {items.length > 2 && (
+                  <div className="text-[9px] text-gray-500 leading-none pl-0.5">+{items.length - 2}건</div>
                 )}
               </div>
             </div>
           );
         })}
       </div>
-      <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
-        <span>━ 기간</span>
-        <span>● 당일</span>
-        <span className="ml-auto">로드맵 + 병원 일정 · 전체는 팀 캘린더에서</span>
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-gray-500">
+        <span>● 당일 · ▬ 기간 · 🏥 병원</span>
+        <span className="ml-auto">전체 일정은 팀 캘린더에서</span>
       </div>
     </div>
   );
