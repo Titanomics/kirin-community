@@ -627,12 +627,17 @@ export default function Home() {
               <CalendarDays className="h-5 w-5 text-indigo-500" /> {effectiveTeam} 캘린더
               <span className="text-xs font-normal text-gray-400">· {month}월</span>
             </h2>
-            <Link href="/calendar" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+            <Link href="/team-calendar" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
               전체 <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="p-4">
-            <MiniCalendar roadmaps={teamRoadmaps} year={year} month={month} />
+            <MiniCalendar
+              roadmaps={teamRoadmaps}
+              hospitalTasks={effectiveTeam === '콘텐츠팀' ? hospitalTasks : []}
+              year={year}
+              month={month}
+            />
           </div>
         </div>
 
@@ -684,7 +689,7 @@ export default function Home() {
   );
 }
 
-function MiniCalendar({ roadmaps, year, month }: { roadmaps: RoadmapItem[]; year: number; month: number }) {
+function MiniCalendar({ roadmaps, hospitalTasks, year, month }: { roadmaps: RoadmapItem[]; hospitalTasks: HospitalTask[]; year: number; month: number }) {
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0);
   const firstDow = firstDay.getDay();
@@ -699,9 +704,28 @@ function MiniCalendar({ roadmaps, year, month }: { roadmaps: RoadmapItem[]; year
     return dayNum >= 1 && dayNum <= daysInMonth ? dayNum : null;
   });
 
-  function roadmapsForDay(dayNum: number): RoadmapItem[] {
+  function itemsForDay(dayNum: number): Array<{ key: string; barClass: string; isSingle: boolean; title: string }> {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-    return roadmaps.filter((r) => dateStr >= r.start_date && dateStr <= r.end_date);
+    const rm = roadmaps
+      .filter((r) => dateStr >= r.start_date && dateStr <= r.end_date)
+      .map((r) => ({
+        key: `rm-${r.id}`,
+        barClass: COLOR_BAR[r.color] || 'bg-blue-500',
+        isSingle: r.start_date === r.end_date,
+        title: r.title,
+      }));
+    const ht = hospitalTasks
+      .filter((t) => t.due_date === dateStr)
+      .map((t) => ({
+        key: `ht-${t.id}`,
+        barClass:
+          t.type === '배너' ? 'bg-orange-500' :
+          t.type === '촬영' ? 'bg-purple-500' :
+          t.type === '업로드' ? 'bg-blue-500' : 'bg-gray-500',
+        isSingle: true,
+        title: `🏥 ${t.title}`,
+      }));
+    return [...rm, ...ht];
   }
 
   return (
@@ -718,7 +742,7 @@ function MiniCalendar({ roadmaps, year, month }: { roadmaps: RoadmapItem[]; year
           if (dayNum === null) {
             return <div key={i} className="min-h-12 rounded" />;
           }
-          const items = roadmapsForDay(dayNum);
+          const items = itemsForDay(dayNum);
           const isToday = isCurrentMonth && dayNum === todayDate;
           const dow = i % 7;
           return (
@@ -734,18 +758,15 @@ function MiniCalendar({ roadmaps, year, month }: { roadmaps: RoadmapItem[]; year
                 {dayNum}
               </div>
               <div className="mt-0.5 space-y-0.5">
-                {items.slice(0, 2).map((r) => {
-                  const isSingle = r.start_date === r.end_date;
-                  return (
-                    <div
-                      key={r.id}
-                      title={r.title}
-                      className={`h-1 rounded-full ${COLOR_BAR[r.color] || 'bg-blue-500'} ${isSingle ? 'w-1.5' : ''}`}
-                    />
-                  );
-                })}
-                {items.length > 2 && (
-                  <div className="text-[9px] text-gray-400 leading-none">+{items.length - 2}</div>
+                {items.slice(0, 3).map((it) => (
+                  <div
+                    key={it.key}
+                    title={it.title}
+                    className={`h-1 rounded-full ${it.barClass} ${it.isSingle ? 'w-1.5' : ''}`}
+                  />
+                ))}
+                {items.length > 3 && (
+                  <div className="text-[9px] text-gray-400 leading-none">+{items.length - 3}</div>
                 )}
               </div>
             </div>
@@ -755,7 +776,7 @@ function MiniCalendar({ roadmaps, year, month }: { roadmaps: RoadmapItem[]; year
       <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-500">
         <span>━ 기간</span>
         <span>● 당일</span>
-        <span className="ml-auto">로드맵만 표시 · 전체는 캘린더 페이지에서</span>
+        <span className="ml-auto">로드맵 + 병원 일정 · 전체는 팀 캘린더에서</span>
       </div>
     </div>
   );
