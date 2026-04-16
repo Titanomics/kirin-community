@@ -272,7 +272,7 @@ export default function Home() {
     return hospitalTasks.filter((t) => {
       const d = daysUntil(t.due_date);
       return d !== null && d <= 7;
-    }).slice(0, 5);
+    }).slice(0, 8);
   }, [hospitalTasks]);
 
   const overdueCount = hospitalTasks.filter((t) => {
