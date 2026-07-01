@@ -88,7 +88,7 @@ export default function AttendancePage() {
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [showCoreValue, setShowCoreValue] = useState(false);
+  const [modalAction, setModalAction] = useState<'check_in' | 'check_out' | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // 1초마다 시간 업데이트
@@ -173,7 +173,6 @@ export default function AttendancePage() {
         return;
       }
       setTodayRecord(json.record);
-      if (action === 'check_in') setShowCoreValue(true);
       await fetchData();
     } catch {
       alert('네트워크 오류가 발생했습니다.');
@@ -241,8 +240,17 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      {showCoreValue && (
-        <CoreValueModal value={getTodayCoreValue()} onClose={() => setShowCoreValue(false)} />
+      {modalAction && (
+        <CoreValueModal
+          value={getTodayCoreValue()}
+          mode={modalAction === 'check_in' ? 'checkin' : 'checkout'}
+          onConfirm={() => {
+            const a = modalAction;
+            setModalAction(null);
+            handleAction(a);
+          }}
+          onClose={() => setModalAction(null)}
+        />
       )}
       {/* 헤더: 현재 시간 + IP 상태 */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -332,7 +340,7 @@ export default function AttendancePage() {
         )}
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => handleAction('check_in')}
+            onClick={() => setModalAction('check_in')}
             disabled={!allowed || !!todayRecord?.check_in || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-4 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
@@ -343,7 +351,7 @@ export default function AttendancePage() {
             )}
           </button>
           <button
-            onClick={() => handleAction('check_out')}
+            onClick={() => setModalAction('check_out')}
             disabled={!allowed || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-gray-700 py-4 text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
