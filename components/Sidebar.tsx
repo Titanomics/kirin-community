@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Clock, UserCheck, X, Target, Building2, CalendarRange } from 'lucide-react';
+import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Clock, UserCheck, X, Target, Building2, CalendarRange, Compass } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { useMemo, useEffect, useState } from 'react';
@@ -54,6 +54,7 @@ export default function Sidebar() {
       { name: '게시판', href: '/board', icon: MessageSquare },
       { name: '캘린더', href: '/calendar', icon: Calendar },
       { name: '팀 캘린더', href: '/team-calendar', icon: CalendarRange },
+      { name: '우리 팀 비전', href: '/team-vision', icon: Compass },
     ];
 
     items.push({ name: 'OKR', href: '/kpi', icon: BarChart3 });
