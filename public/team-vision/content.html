@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>컨텐츠팀 OS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  * { font-family: 'Noto Sans KR', sans-serif; }
+  body { background: #fafbfc; }
+  .nav-item { transition: all 0.15s ease; }
+  .nav-item:hover { background: #eff6ff; transform: translateX(2px); }
+  .nav-item.active { background: #1e40af; color: white; }
+  .card { transition: all 0.2s ease; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  .section { display: none; animation: fadeIn 0.3s ease; }
+  .section.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .role-tag { display: inline-block; padding: 3px 9px; border-radius: 11px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .arrow-down::after { content: '↓'; display: block; font-size: 20px; color: #94A3B8; text-align: center; margin: 8px 0; }
+
+  .hover-target { position: relative; cursor: pointer; }
+  .hover-target:hover { z-index: 999; }
+  .hover-detail {
+    position: absolute; left: 0; top: calc(100% + 8px);
+    background: white; border: 1px solid #cbd5e1; border-radius: 12px;
+    padding: 18px; min-width: 320px; max-width: 460px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+    opacity: 0; pointer-events: none; transform: translateY(-4px);
+    transition: all 0.2s; z-index: 9999;
+  }
+  .hover-target:hover .hover-detail { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .card, .space-y-3 { overflow: visible !important; }
+
+  /* 인물 탭 */
+  .person-tab { color: #64748b; border-color: transparent; transition: all 0.15s; }
+  .person-tab:hover { color: #0f172a; }
+  .person-tab.active { color: #1e40af; border-color: #1e40af; }
+
+  .gauge-wrap { position: relative; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+  .gauge-bar { height: 100%; border-radius: 999px; transition: width 0.4s ease, background 0.4s; }
+  .gauge-bar.low { background: #ef4444; }
+  .gauge-bar.mid { background: #f59e0b; }
+  .gauge-bar.high { background: #10b981; }
+  .kpi-input { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+  .kpi-input:focus { outline: none; border-color: #1e40af; }
+</style>
+</head>
+<body class="text-slate-800">
+
+<div class="flex min-h-screen">
+
+  <!-- 사이드바 -->
+  <aside class="w-64 bg-white border-r border-slate-200 sticky top-0 h-screen overflow-y-auto">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">C</div>
+        <div>
+          <div class="font-bold text-lg">컨텐츠팀</div>
+          <div class="text-xs text-slate-500">회사 OS · v1</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="p-3 space-y-1">
+      <div class="text-xs font-semibold text-slate-400 px-3 py-2">방향성</div>
+      <div class="nav-item active rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="mission">
+        <span>🎯</span> 미션
+      </div>
+      <div class="nav-item rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="vision">
+        <span>🔭</span> 비전 (5년 후)
+      </div>
+      <div class="nav-item rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="values">
+        <span>💎</span> 핵심가치
+      </div>
+
+      <div class="text-xs font-semibold text-slate-400 px-3 py-2 pt-4">사람</div>
+      <div class="nav-item rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="org">
+        <span>🧬</span> 책임조직도
+      </div>
+
+      <div class="text-xs font-semibold text-slate-400 px-3 py-2 pt-4">운영</div>
+      <div class="nav-item rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="dashboard">
+        <span>📊</span> 계기판
+      </div>
+      <div class="nav-item rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="rocks">
+        <span>🪨</span> 분기 짱돌
+      </div>
+
+      <div class="text-xs font-semibold text-slate-400 px-3 py-2 pt-4">유지</div>
+      <div class="nav-item rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="meeting">
+        <span>🤝</span> 회의 운영
+      </div>
+      <div class="nav-item rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2 text-sm" data-target="assets">
+        <span>📦</span> 자산화 시스템
+      </div>
+    </nav>
+
+    <div class="p-4 border-t border-slate-100 mt-4">
+      <div class="text-xs text-slate-400">v1 · 2026-06-22</div>
+      <div class="text-xs text-slate-400 mt-1">송정익 · 김경록 공동대표</div>
+    </div>
+  </aside>
+
+  <!-- 메인 -->
+  <main class="flex-1 p-10 max-w-6xl">
+
+    <!-- 미션 -->
+    <section id="mission" class="section active">
+      <h1 class="text-3xl font-bold mb-2">미션</h1>
+      <div class="text-slate-500 mb-8">컨텐츠팀이 존재하는 이유</div>
+
+      <div class="card bg-white rounded-2xl p-10 border-2 border-blue-200 mb-6">
+        <div class="text-3xl font-bold leading-relaxed text-slate-900">
+          컨텐츠팀은 <span class="text-blue-700">진료만 하고 싶은 병원 원장</span>에게<br>
+          <span class="text-blue-700">진료 외 모든 영역의 통합 시스템화 서비스</span>를<br>
+          <span class="text-blue-700">운영하는 팀</span>입니다.
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-5">
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="text-xs font-semibold text-slate-500 mb-2">진화 방향</div>
+          <div class="font-bold mb-1">병원 마케팅팀 구독 → 통째로 위탁받는 회사</div>
+          <div class="text-xs text-slate-500 mt-2">단순 대행 X / MSO (병원경영 + 원장 브랜딩 위탁)</div>
+        </div>
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="text-xs font-semibold text-slate-500 mb-2">차별점</div>
+          <div class="font-bold mb-1">마케팅 + 운영 + HR + 원장 브랜딩 통합</div>
+          <div class="text-xs text-slate-500 mt-2">한 회사가 다 한다 = 한국 신모델</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 비전 -->
+    <section id="vision" class="section">
+      <h1 class="text-3xl font-bold mb-2">5년 후 우리 모습 (2031년)</h1>
+      <div class="text-slate-500 mb-8">병원 운영 + 원장 브랜딩을 통째로 맡는 한국형 회사</div>
+
+      <div class="grid grid-cols-4 gap-4 mb-8">
+        <div class="card bg-gradient-to-br from-purple-50 to-white rounded-2xl p-6 border border-purple-200 text-center">
+          <div class="text-xs text-purple-700 font-semibold mb-2">위탁 병원</div>
+          <div class="text-4xl font-bold text-slate-900">5<span class="text-xl text-slate-500">개</span></div>
+          <div class="text-xs text-slate-500 mt-2">정예 운영</div>
+        </div>
+        <div class="card bg-gradient-to-br from-purple-50 to-white rounded-2xl p-6 border border-purple-200 text-center">
+          <div class="text-xs text-purple-700 font-semibold mb-2">검진센터</div>
+          <div class="text-4xl font-bold text-slate-900">300<span class="text-xl text-slate-500">평</span></div>
+          <div class="text-xs text-slate-500 mt-2">종합+특화 1호점</div>
+        </div>
+        <div class="card bg-gradient-to-br from-purple-50 to-white rounded-2xl p-6 border border-purple-200 text-center">
+          <div class="text-xs text-purple-700 font-semibold mb-2">연 매출</div>
+          <div class="text-4xl font-bold text-slate-900">50<span class="text-xl text-slate-500">억</span></div>
+          <div class="text-xs text-slate-500 mt-2">통합 매출</div>
+        </div>
+        <div class="card bg-gradient-to-br from-purple-50 to-white rounded-2xl p-6 border-2 border-purple-300 text-center">
+          <div class="text-xs text-purple-700 font-semibold mb-2">영업이익 ★</div>
+          <div class="text-4xl font-bold text-slate-900">15<span class="text-xl text-slate-500">억</span></div>
+          <div class="text-xs text-slate-500 mt-2">영업이익률 30%</div>
+        </div>
+      </div>
+
+      <div class="card bg-white rounded-2xl p-6 border border-slate-200 mb-5">
+        <div class="font-bold mb-3">📈 시스템 표준화 = 다른 곳 그대로 복제 가능</div>
+        <div class="text-sm text-slate-600">매뉴얼·프로세스·콘텐츠 라이브러리 = 한 번 만들면 신규 위탁 시 즉시 적용 가능 → 프랜차이즈로 진입 가능</div>
+      </div>
+
+      <div class="card bg-slate-50 rounded-xl p-5 border border-slate-200">
+        <div class="text-sm font-semibold mb-2">📅 그 다음 5년 (2036년 잠재)</div>
+        <div class="text-sm text-slate-600">검진센터 2호점 → 프랜차이즈 진입 / 위탁 병원 10+개 / 영업이익 30+억</div>
+      </div>
+    </section>
+
+    <!-- 핵심가치 -->
+    <section id="values" class="section">
+      <h1 class="text-3xl font-bold mb-2">핵심가치</h1>
+      <div class="text-slate-500 mb-8">행동으로 보여줘야 살아있는 가치</div>
+
+      <!-- 1. 전문성 -->
+      <div class="card bg-white rounded-2xl p-6 border-2 border-blue-200 mb-5">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="text-4xl">🎯</div>
+          <div>
+            <div class="text-2xl font-bold">1. 전문성 (Professionalism)</div>
+          </div>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-4 my-3">
+          <div class="font-semibold text-blue-900 text-lg">더 빠르게, 더 높이, 더 강하게 그리고 함께.</div>
+          <div class="text-sm text-blue-800 mt-1">과정의 노력으로 변명하지 않고, 결과의 완결성으로 증명합니다.</div>
+        </div>
+        <div class="space-y-3 mt-4">
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">1.</div>
+            <div class="text-sm">우리는 <b class="text-blue-700">[실행을 시작하기 전에]</b>,<br>
+            <b class="text-blue-700">[의도와 예상 결과를 먼저 정의한다]</b>.</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">2.</div>
+            <div class="text-sm">우리는 <b class="text-blue-700">[팀장에게 결과물을 공유하기 전에]</b>,<br>
+            <b class="text-blue-700">[오탈자/로직/퀄리티를 셀프 검증한다]</b>.</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">3.</div>
+            <div class="text-sm">우리는 <b class="text-blue-700">[마감을 못 지킬 것 같으면]</b>,<br>
+            <b class="text-blue-700">[사고가 터지기 전에 미리 공유한다]</b>.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 대중성 -->
+      <div class="card bg-white rounded-2xl p-6 border-2 border-amber-200 mb-5">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="text-4xl">👥</div>
+          <div>
+            <div class="text-2xl font-bold">2. 대중성 (Popularity)</div>
+          </div>
+        </div>
+        <div class="bg-amber-50 rounded-lg p-4 my-3">
+          <div class="font-semibold text-amber-900 text-lg">철저히 고객의 시선으로, 고객의 언어로.</div>
+          <div class="text-sm text-amber-800 mt-1">내 취향을 버리고 철저한 데이터와 공감력을 숭배합니다.</div>
+        </div>
+        <div class="space-y-3 mt-4">
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">1.</div>
+            <div class="text-sm">우리는 <b class="text-amber-700">[의사결정할 때]</b>,<br>
+            <b class="text-amber-700">[회의실 논리 X, 리뷰/CS/CTR 데이터를 본다]</b>.</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">2.</div>
+            <div class="text-sm">우리는 <b class="text-amber-700">[고객용 콘텐츠를 만들 때]</b>,<br>
+            <b class="text-amber-700">[중학생이 이해할 수 있는 언어로 쓴다]</b>.</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">3.</div>
+            <div class="text-sm">우리는 <b class="text-amber-700">[고객이 불편을 말하기 전에]</b>,<br>
+            <b class="text-amber-700">"이거 필요하시죠?" [먼저 제안한다]</b>.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 역동성 -->
+      <div class="card bg-white rounded-2xl p-6 border-2 border-rose-200">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="text-4xl">⚡</div>
+          <div>
+            <div class="text-2xl font-bold">3. 역동성 (Dynamism)</div>
+          </div>
+        </div>
+        <div class="bg-rose-50 rounded-lg p-4 my-3">
+          <div class="font-semibold text-rose-900 text-lg">고인 물은 썩습니다.</div>
+          <div class="text-sm text-rose-800 mt-1">끊임없이 움직이고 변화를 주도합니다.</div>
+        </div>
+        <div class="space-y-3 mt-4">
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">1.</div>
+            <div class="text-sm">우리는 <b class="text-rose-700">[내 영역이 아닌 일을 봐도]</b>,<br>
+            <b class="text-rose-700">"제가 해보겠습니다" [먼저 말한다]</b>.</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">2.</div>
+            <div class="text-sm">우리는 <b class="text-rose-700">[문제를 보고할 때]</b>,<br>
+            <b class="text-rose-700">[해결책 3개를 같이 가져온다]</b>.</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">3.</div>
+            <div class="text-sm">우리는 <b class="text-rose-700">[100점 vs 80점 사이에서]</b>,<br>
+            <b class="text-rose-700">[80점 실행을 먼저 한다]</b>.</div>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 flex gap-3">
+            <div class="text-slate-400 font-bold">4.</div>
+            <div class="text-sm">우리는 <b class="text-rose-700">[오늘 뜬 밈/이슈를]</b>,<br>
+            <b class="text-rose-700">[내일 콘텐츠에 바로 녹인다]</b>.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 책임조직도 -->
+    <section id="org" class="section">
+      <h1 class="text-3xl font-bold mb-2">책임조직도</h1>
+      <div class="text-slate-500 mb-8">자리별 R&R · 마우스 호버 시 상세 책임</div>
+
+      <!-- CEO -->
+      <div class="flex justify-center mb-2">
+        <div class="card bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border-2 border-blue-300 text-center min-w-[280px] hover-target">
+          <div class="role-tag bg-blue-600 text-white mb-2">대표 (CEO)</div>
+          <div class="text-lg font-bold mt-2">대외 얼굴 + 최종 의사결정</div>
+          <div class="badge bg-blue-200 text-blue-900 mt-2">송정익</div>
+          <div class="hover-detail text-slate-800 text-left">
+            <div class="font-bold mb-2">송정익 = 3 모자</div>
+            <ul class="text-xs space-y-1.5">
+              <li>· CEO (대외 얼굴 + 최종 결정)</li>
+              <li>· CMO (영업·외부 매출·마케팅·브랜딩)</li>
+              <li>· CMO 산하 5박스 임시</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="arrow-down"></div>
+
+      <!-- 전체 조율자 -->
+      <div class="flex justify-center mb-2">
+        <div class="card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5 border-2 border-indigo-300 text-center min-w-[420px] hover-target">
+          <div class="role-tag bg-indigo-600 text-white mb-2">전체 조율자</div>
+          <div class="text-lg font-bold mt-2">3축 조정 + 인사·세무·자금 통합</div>
+          <div class="badge bg-indigo-200 text-indigo-900 mt-2">김경록</div>
+          <div class="hover-detail text-slate-800 text-left">
+            <div class="font-bold mb-2">김경록 = 3 모자</div>
+            <ul class="text-xs space-y-1.5">
+              <li>· 전체 조율자 (3축 KPI·조정)</li>
+              <li>· COO (위탁 병원 운영 + 시스템)</li>
+              <li>· CCO (콘텐츠 자산화·SEO·디지털)</li>
+              <li>· 인사·세무·자금 통합 관리</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="arrow-down"></div>
+
+      <!-- 3축 -->
+      <div class="grid grid-cols-3 gap-4">
+
+        <!-- CMO -->
+        <div>
+          <div class="card bg-gradient-to-br from-green-50 to-white rounded-xl p-4 border-2 border-green-300 text-center mb-3">
+            <div class="role-tag bg-green-600 text-white mb-2">CMO · 영업·마케팅</div>
+            <div class="font-bold">송정익</div>
+            <div class="text-xs text-slate-600 mt-1">외부 매출 책임</div>
+          </div>
+          <div class="space-y-3">
+
+            <div class="card bg-white rounded-lg p-4 border border-green-300 hover-target">
+              <div class="text-xs font-bold text-green-700 mb-1">1-1. 신규 영업</div>
+              <div class="text-xs text-slate-500">송정익 (임시)</div>
+              <div class="hover-detail text-slate-800 text-left">
+                <div class="font-bold mb-2">1-1. 신규 영업</div>
+                <ul class="text-xs space-y-1.5">
+                  <li>· 위탁 병원 신규 계약 영업</li>
+                  <li>· 검진센터 외부 영업 (개설 후)</li>
+                  <li>· 신규 파트너·병원 컨택</li>
+                  <li>· 제안서·계약서 작성</li>
+                </ul>
+                <div class="text-xs text-amber-700 mt-2 pt-2 border-t font-semibold">🟡 자율 룰: 의원급 X / 500+ 케이스바이케이스 / MSO 가능성 = 무조건</div>
+              </div>
+            </div>
+
+            <div class="card bg-white rounded-lg p-4 border border-green-300 hover-target">
+              <div class="text-xs font-bold text-green-700 mb-1">1-2. 광고 운영</div>
+              <div class="text-xs text-slate-500">송정익 (임시)</div>
+              <div class="hover-detail text-slate-800 text-left">
+                <div class="font-bold mb-2">1-2. 광고 운영</div>
+                <ul class="text-xs space-y-1.5">
+                  <li>· 당근마켓·파워링크·메타광고·구글</li>
+                  <li>· 의료광고심의 대리</li>
+                  <li>· 광고 예산·ROAS 관리</li>
+                  <li>· 신규 광고 채널 테스트</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="card bg-white rounded-lg p-4 border-2 border-dashed border-red-400 opacity-90">
+              <div class="text-xs font-bold text-red-600 mb-1">1-3. 해외환자 유치</div>
+              <div class="text-xs text-slate-500">[공석] 미래 채용</div>
+            </div>
+
+            <div class="card bg-white rounded-lg p-4 border-2 border-dashed border-red-400 opacity-90">
+              <div class="text-xs font-bold text-red-600 mb-1">1-4. 체험단·외부 마케팅</div>
+              <div class="text-xs text-slate-500">[공석] 미래 채용</div>
+            </div>
+
+            <div class="card bg-white rounded-lg p-4 border border-green-300 hover-target">
+              <div class="text-xs font-bold text-green-700 mb-1">1-5. 병원 브랜딩</div>
+              <div class="text-xs text-slate-500">송정익 (임시) · 디자이너 1 산하</div>
+              <div class="hover-detail text-slate-800 text-left">
+                <div class="font-bold mb-2">1-5. 병원 브랜딩</div>
+                <ul class="text-xs space-y-1.5">
+                  <li>· 위탁 병원 이미지 (팜플렛·리플렛·배너)</li>
+                  <li>· 환자 선물·환자 응대 시각물</li>
+                  <li>· 위탁 병원 홈페이지 시각 자산</li>
+                  <li>· 원내 이벤트 기획</li>
+                  <li>· 자사 검진센터 브랜딩 (개설 후)</li>
+                </ul>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- COO -->
+        <div>
+          <div class="card bg-gradient-to-br from-orange-50 to-white rounded-xl p-4 border-2 border-orange-300 text-center mb-3">
+            <div class="role-tag bg-orange-600 text-white mb-2">COO · 운영</div>
+            <div class="font-bold">김경록</div>
+            <div class="text-xs text-slate-600 mt-1">위탁 병원 운영 + 시스템</div>
+          </div>
+          <div class="space-y-3">
+
+            <div class="card bg-white rounded-lg p-4 border border-orange-300 hover-target">
+              <div class="text-xs font-bold text-orange-700 mb-1">2-1. 위탁 병원 내부 운영</div>
+              <div class="text-xs text-slate-500">김경록 (임시) → 미래 채용</div>
+              <div class="hover-detail text-slate-800 text-left">
+                <div class="font-bold mb-2">2-1. 위탁 병원 내부 운영</div>
+                <ul class="text-xs space-y-1.5">
+                  <li>· 위탁 병원 원내 직원 관리·교육</li>
+                  <li>· 응대 스크립트·DB·매뉴얼 표준화</li>
+                  <li>· HR 시스템 (본사 + 위탁 병원)</li>
+                  <li>· AI 자동화·시스템 엔지니어링</li>
+                  <li>· 신입 온보딩 시스템</li>
+                  <li>· 프랜차이즈 복제 가능 표준 작업</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="card bg-white rounded-lg p-4 border-2 border-dashed border-red-400 opacity-90">
+              <div class="text-xs font-bold text-red-600 mb-1">2-2. 검진센터 운영</div>
+              <div class="text-xs text-slate-500">[공석] 4~5년차 채용</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- CCO -->
+        <div>
+          <div class="card bg-gradient-to-br from-pink-50 to-white rounded-xl p-4 border-2 border-pink-300 text-center mb-3">
+            <div class="role-tag bg-pink-600 text-white mb-2">CCO · 콘텐츠</div>
+            <div class="font-bold">김경록</div>
+            <div class="text-xs text-slate-600 mt-1">콘텐츠 자산화</div>
+          </div>
+          <div class="space-y-3">
+
+            <div class="card bg-white rounded-lg p-4 border border-pink-300 hover-target">
+              <div class="text-xs font-bold text-pink-700 mb-1">3-1. 블로그·SEO 라인</div>
+              <div class="text-xs text-slate-500">김경록 (임시) · 블로그 1 + 정리 1 산하</div>
+              <div class="hover-detail text-slate-800 text-left">
+                <div class="font-bold mb-2">3-1. 블로그·SEO 라인</div>
+                <ul class="text-xs space-y-1.5">
+                  <li>· 블로그 작성·운영</li>
+                  <li>· 카페바이럴</li>
+                  <li>· 지식인·GEO (생성형 AI 노출)</li>
+                  <li>· 키워드·상위노출 시스템</li>
+                  <li>· 글 콘텐츠 자산화·매뉴얼</li>
+                </ul>
+                <div class="text-xs text-blue-700 mt-2 pt-2 border-t font-semibold">🟡 GEO = 상품화 X / 실력 쌓기 (MSO 안에 껴주기)</div>
+              </div>
+            </div>
+
+            <div class="card bg-white rounded-lg p-4 border border-pink-300 hover-target">
+              <div class="text-xs font-bold text-pink-700 mb-1">3-2. 영상·SNS 라인</div>
+              <div class="text-xs text-slate-500">송정익 (임시) · 영상관리 1 산하</div>
+              <div class="hover-detail text-slate-800 text-left">
+                <div class="font-bold mb-2">3-2. 영상·SNS 라인</div>
+                <ul class="text-xs space-y-1.5">
+                  <li>· 유튜브 롱폼·숏폼</li>
+                  <li>· 인스타 릴스·스레드</li>
+                  <li>· 원장 IP 영상화</li>
+                  <li>· 원장 관리·소통</li>
+                  <li>· 영상 자산 카탈로그</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="card bg-white rounded-lg p-4 border-2 border-dashed border-red-400 opacity-90">
+              <div class="text-xs font-bold text-red-600 mb-1">3-3. 디지털 자산·시스템</div>
+              <div class="text-xs text-slate-500">[공석] 4~5년차 채용</div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card bg-slate-50 rounded-xl p-5 border border-slate-200 mt-5">
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <b class="text-blue-700">송정익 = 3 모자</b><br>
+            <span class="text-xs text-slate-600">CEO + CMO + CMO 산하 5박스 임시</span>
+          </div>
+          <div>
+            <b class="text-indigo-700">김경록 = 3 모자</b><br>
+            <span class="text-xs text-slate-600">전체 조율자 + COO + CCO + 산하 임시</span>
+          </div>
+        </div>
+        <div class="text-xs text-slate-500 mt-3 border-t border-slate-200 pt-3">
+          ★ 5년 안 = 매니저 자리들 채용 → 임시 겸직 해소 / 블로그 직원 = 콘텐츠 매니저로 키움
+        </div>
+      </div>
+    </section>
+
+    <!-- 포지션 계약서 -->
+    <section id="positions" class="section" style="display:none !important">
+      <h1 class="text-3xl font-bold mb-2">포지션 계약서</h1>
+      <div class="text-slate-500 mb-8">BOS 4섹션 양식 · 4명 풀 · 갱신 분기 1회 + 연간 정식 + 수시</div>
+
+      <!-- 마스터 원칙 -->
+      <div class="card bg-slate-50 rounded-2xl p-6 border border-slate-200 mb-6">
+        <div class="font-bold text-lg mb-4">📜 [원칙] 4명 공통 마스터</div>
+        <div class="grid grid-cols-3 gap-4 mb-5">
+          <div class="bg-white rounded-lg p-4 border border-slate-200">
+            <div class="text-xs font-semibold text-slate-700 mb-2">분기별 점검</div>
+            <div class="text-xs text-slate-600">분기 목표 달성 + 열정 지점 유효성 점검. 평가 X = 상호 피드백·정렬.</div>
+          </div>
+          <div class="bg-white rounded-lg p-4 border border-slate-200">
+            <div class="text-xs font-semibold text-slate-700 mb-2">연간 정식 갱신</div>
+            <div class="text-xs text-slate-600">매년 1회 = 보상 체계 조정 + 계약서 전체 재검토 + 새로 서명.</div>
+          </div>
+          <div class="bg-white rounded-lg p-4 border border-slate-200">
+            <div class="text-xs font-semibold text-slate-700 mb-2">수시 갱신</div>
+            <div class="text-xs text-slate-600">책임조직도 변경·승진·직무 전환 시 즉시 갱신.</div>
+          </div>
+        </div>
+        <div class="font-semibold text-sm mb-3">⚙️ 운영 원칙</div>
+        <div class="grid grid-cols-2 gap-3 text-xs text-slate-700">
+          <div class="bg-white rounded p-3 border border-slate-200"><b>상시 열람</b> — 서명 후 = 협업 툴에 보관</div>
+          <div class="bg-white rounded p-3 border border-slate-200"><b>솔직한 수정</b> — 갱신 전이라도 면담 요청 → 수정</div>
+          <div class="bg-white rounded p-3 border border-slate-200"><b>상호 책임</b> — 리더 = 자원·심리적 지지 제공</div>
+          <div class="bg-white rounded p-3 border border-slate-200"><b>핵심가치 준수</b> — 동일 가치 3회 미준수 = 시스템 검토</div>
+          <div class="bg-white rounded p-3 border border-slate-200 col-span-2"><b>주간 회의 안건 통합</b> — 그때그때 컴플레인 X = 주간 회의에서 한 번에</div>
+        </div>
+      </div>
+
+      <!-- 인물 탭 -->
+      <div class="flex gap-2 mb-5 border-b border-slate-200">
+        <button class="person-tab active px-5 py-3 font-semibold text-sm border-b-2" data-person="yubin">유빈</button>
+        <button class="person-tab px-5 py-3 font-semibold text-sm border-b-2" data-person="jinsun">진선</button>
+        <button class="person-tab px-5 py-3 font-semibold text-sm border-b-2" data-person="hyungjin">형진</button>
+        <button class="person-tab px-5 py-3 font-semibold text-sm border-b-2" data-person="kyungmin">경민</button>
+      </div>
+
+      <!-- 유빈 -->
+      <div class="person-content" id="person-yubin">
+        <div class="card bg-white rounded-2xl p-6 border border-slate-200">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <div class="font-bold text-2xl">유빈</div>
+              <div class="text-sm text-slate-600 mt-1">디자이너 (CMO 1-5 산하 · 위탁 병원 브랜딩)</div>
+            </div>
+            <span class="badge bg-emerald-100 text-emerald-700">합의 100%</span>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">① 책임조직도 내 기능과 역할</div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>존재 이유</b><br>
+              <span class="text-slate-600">컨텐츠팀의 모든 시각 자산을 회사 미션(진료 외 통합 시스템화)과 정렬시키는 사람</span>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>책임 영역</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>· 위탁 병원 브랜딩 (팜플렛·리플렛·배너)</li>
+                <li>· 환자 선물·응대 시각물</li>
+                <li>· 위탁 병원 홈페이지 시각 자산</li>
+                <li>· 자사 검진센터 브랜딩 (개설 후)</li>
+              </ul>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>핵심 숫자 (KPI 3축 — 갯수 X / 자산화 중심)</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>① [자산화-학습] 외부 디자인·의료광고 심의법 학습 = 우리 방식으로 자산화 (PDF → 사내 PPT → OS)</li>
+                <li>② [자산화-결과물] 위탁 병원 표준 브랜딩 패키지 v1 (분기 짱돌 ②) 핵심 기여</li>
+                <li>③ [결과] 위탁 병원 디자인 만족도 평균 8/10+</li>
+              </ul>
+            </div>
+            <div class="bg-amber-50 rounded p-3 mt-3 text-xs border border-amber-200">
+              <b class="text-amber-900">분기 목표 Q3</b>
+              <ul class="mt-2 space-y-1 text-amber-800">
+                <li>① 브랜딩 패키지 v1 완료</li>
+                <li>② 의료광고 심의법 학습 자료 1개 정리 + 사내 공유</li>
+                <li>③ AI 디자인 도구 1개 마스터</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">② 직무 역량 및 자원</div>
+            <div class="space-y-2 text-xs">
+              <div class="bg-white rounded p-3">☐ 기술적 역량 — 시각 디자인 + 의료광고 심의 학습 준비?</div>
+              <div class="bg-white rounded p-3">☐ 심리적 역량 — "내 족적 남기기" 동기 = 책임 완수 가능?</div>
+              <div class="bg-white rounded p-3">☐ 시간적 자원 — 학습 + 본업 균형 = 시간 관리 가능?</div>
+            </div>
+            <div class="text-xs font-semibold text-slate-700 mt-4 mb-2">회사가 보장하는 자원</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-white rounded p-3"><b>A. 의료광고 심의법 PDF</b><br><span class="text-slate-600">+ 학습 시간 보장</span></div>
+              <div class="bg-white rounded p-3"><b>B. AI 도구·계정</b><br><span class="text-slate-600">Nano Banana·MJ·PS-AI 등</span></div>
+              <div class="bg-white rounded p-3"><b>C. 외장하드·자료 풀</b><br><span class="text-slate-600">1테라 + 레퍼런스</span></div>
+              <div class="bg-white rounded p-3"><b>D. 인쇄소 협상</b><br><span class="text-slate-600">회사 / 시안 전달만</span></div>
+            </div>
+          </div>
+
+          <div class="bg-amber-50 rounded-lg p-5 border border-amber-200">
+            <div class="font-semibold text-sm text-amber-900 mb-3">④ 개인 의미와 보상</div>
+            <div class="text-xs font-semibold text-amber-900 mb-2">열정 지점 (사장 짐작 → 1:1 컨펌 필요)</div>
+            <ul class="text-xs text-amber-800 space-y-1 mb-3">
+              <li>① "내 족적 남기기" — 위탁 병원 브랜딩 = 가시적 결과물</li>
+              <li>② 안정적 환경에서 깊이 파기</li>
+              <li>③ 새 도구 빠른 흡수</li>
+            </ul>
+            <div class="grid grid-cols-3 gap-2 text-xs mt-3">
+              <div class="bg-white rounded p-3"><b>기본급</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+              <div class="bg-white rounded p-3"><b>성과급</b><br><span class="text-slate-600">Q3 목표 + 검진센터 트리거</span></div>
+              <div class="bg-white rounded p-3"><b>복리후생</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+            </div>
+            <div class="text-xs text-slate-500 mt-3 pt-3 border-t border-amber-200">서명: 작성자(유빈) ____________ · 송정익 ____________ · 김경록 ____________</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 진선 -->
+      <div class="person-content" id="person-jinsun" style="display:none">
+        <div class="card bg-white rounded-2xl p-6 border border-slate-200">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <div class="font-bold text-2xl">진선</div>
+              <div class="text-sm text-slate-600 mt-1">운영 (COO 2-1) + 영상·SNS (CCO 3-2) 겸직</div>
+            </div>
+            <span class="badge bg-emerald-100 text-emerald-700">합의 100%</span>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">① 책임조직도 내 기능과 역할</div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>존재 이유</b><br>
+              <span class="text-slate-600">위탁 병원 원내 운영의 디테일을 자산화해서 신규 위탁 시 즉시 복제 가능하게 만드는 사람</span>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>책임 영역</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>· 위탁 병원 원내 운영 디테일 (엘리베이터·층수 안내·콘텐츠 공사장)</li>
+                <li>· 운영 매뉴얼 표준화 (정익과 공동)</li>
+                <li>· 영상 제작·SNS 자산 (유튜브·릴스·스레드)</li>
+                <li>· 원장 IP 영상화 보조</li>
+              </ul>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>핵심 숫자 (KPI 3축)</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>① [자기개발] 외부 운영·영상 도구 교육 분기 2회+ / 본인 컨디션 보호 우선</li>
+                <li>② [자산화] 운영 매뉴얼 v1 (정익과 공동, 분기 짱돌 ①) + 영상 자산 카탈로그</li>
+                <li>③ [결과] <b>분기 영상 1건 도달 30만+</b> ★ (4월 릴스 31만 재현)</li>
+              </ul>
+            </div>
+            <div class="bg-amber-50 rounded p-3 mt-3 text-xs border border-amber-200">
+              <b class="text-amber-900">분기 목표 Q3</b>
+              <ul class="mt-2 space-y-1 text-amber-800">
+                <li>① 운영 매뉴얼 v1 완성 (정익 공동)</li>
+                <li>② 하임리히 촬영 마무리 (6월 이월 1순위)</li>
+                <li>③ 분기 영상 1건 도달 30만+</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">② 직무 역량 및 자원</div>
+            <div class="space-y-2 text-xs">
+              <div class="bg-white rounded p-3">☐ 기술적 역량 — 운영 + 영상 둘 다 가능, 학습 준비?</div>
+              <div class="bg-white rounded p-3">☐ 심리적 역량 — 5월 회복 → 6월 복귀 = 컨디션 관리?</div>
+              <div class="bg-white rounded p-3">☐ 시간적 자원 — 본업 + 학습 시간 관리?</div>
+            </div>
+            <div class="text-xs font-semibold text-slate-700 mt-4 mb-2">회사가 보장하는 자원</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-white rounded p-3"><b>A. 클라이언트 소통 부담 X</b><br><span class="text-slate-600">정익이 대응 (5/29 결산)</span></div>
+              <div class="bg-white rounded p-3"><b>B. 영상 외주 풀</b><br><span class="text-slate-600">셋업·유지 / 디렉팅만</span></div>
+              <div class="bg-white rounded p-3"><b>C. 재택·컨디션 유연</b><br><span class="text-slate-600">5월 결산 박힘</span></div>
+              <div class="bg-white rounded p-3"><b>D. 영상 도구·장비</b><br><span class="text-slate-600">회사 부담</span></div>
+            </div>
+          </div>
+
+          <div class="bg-amber-50 rounded-lg p-5 border border-amber-200">
+            <div class="font-semibold text-sm text-amber-900 mb-3">④ 개인 의미와 보상</div>
+            <div class="text-xs font-semibold text-amber-900 mb-2">열정 지점 (5/29 1:1 답)</div>
+            <ul class="text-xs text-amber-800 space-y-1 mb-3">
+              <li>① 영상 터질 때 도파민 — 4월 릴스 31만 = 본인 동기 영역</li>
+              <li>② 운영 디테일 기획 — 정익과 공동 기획</li>
+              <li>③ 클라이언트 소통은 No — 회사가 대신</li>
+            </ul>
+            <div class="grid grid-cols-2 gap-2 text-xs mt-3">
+              <div class="bg-white rounded p-3"><b>기본급</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+              <div class="bg-white rounded p-3"><b>성과급</b><br><span class="text-slate-600">Q3 KPI + 영상 도달 트리거</span></div>
+              <div class="bg-white rounded p-3"><b>복리후생</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+              <div class="bg-white rounded p-3"><b>스톡옵션·지분</b><br><span class="text-slate-600">별도 합의 (5/29 박힘)</span></div>
+            </div>
+            <div class="text-xs text-slate-500 mt-3 pt-3 border-t border-amber-200">서명: 작성자(진선) ____________ · 송정익 ____________ · 김경록 ____________</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 형진 -->
+      <div class="person-content" id="person-hyungjin" style="display:none">
+        <div class="card bg-white rounded-2xl p-6 border border-slate-200">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <div class="font-bold text-2xl">형진</div>
+              <div class="text-sm text-slate-600 mt-1">블로그·콘텐츠팀장 (CCO 3-1, 콘텐츠 시스템 설계자)</div>
+            </div>
+            <span class="badge bg-emerald-100 text-emerald-700">합의 100%</span>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">① 책임조직도 내 기능과 역할</div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>존재 이유</b><br>
+              <span class="text-slate-600">콘텐츠 양산을 시스템으로 만들어 신규 위탁 시 즉시 가동 가능하게 만드는 사람 (콘텐츠 시스템 설계자)</span>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>책임 영역</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>· 블로그·카페바이럴 작성·운영</li>
+                <li>· 키워드·상위노출 시스템</li>
+                <li>· 경민 교육 (★1순위, 5/29 박힘)</li>
+                <li>· 콘텐츠 양산 시스템 매뉴얼</li>
+              </ul>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>핵심 숫자 (KPI 3축)</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>① [자기개발] 외부 글쓰기·SEO·AI 영상 교육 분기 2회+</li>
+                <li>② [자산화] 블로그 글 자산 카탈로그 v1 + 경민 교육 매뉴얼 + AI 영상 시드 (D-Day 롱폼2+숏폼4)</li>
+                <li>③ [결과] <b>경민 자율 작성률 100%</b> ★ = 형진 검수 없이 발행 가능</li>
+              </ul>
+            </div>
+            <div class="bg-amber-50 rounded p-3 mt-3 text-xs border border-amber-200">
+              <b class="text-amber-900">분기 목표 Q3</b>
+              <ul class="mt-2 space-y-1 text-amber-800">
+                <li>① 경민 안착 = 사진 정리·원고 위임 100%</li>
+                <li>② 카페바이럴 시스템 매뉴얼 v1</li>
+                <li>③ AI 영상 시드 1건 (D-Day 롱폼2+숏폼4)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">② 직무 역량 및 자원</div>
+            <div class="space-y-2 text-xs">
+              <div class="bg-white rounded p-3">☐ 기술적 역량 — 블로그·SEO + AI 영상 학습 준비?</div>
+              <div class="bg-white rounded p-3">☐ 심리적 역량 — 번아웃 조짐 → 시스템 설계자 승격 = 동기 회복?</div>
+              <div class="bg-white rounded p-3">☐ 시간적 자원 — 본업 + 교육 + AI 영상 시드 = 시간 관리?</div>
+            </div>
+            <div class="text-xs font-semibold text-slate-700 mt-4 mb-2">회사가 보장하는 자원</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-white rounded p-3"><b>A. 양산 분산</b><br><span class="text-slate-600">경민·유빈에게 (6/22 박힘)</span></div>
+              <div class="bg-white rounded p-3"><b>B. 정익 보고라인 케어</b><br><span class="text-slate-600">정익이 직접 (5/29 결산)</span></div>
+              <div class="bg-white rounded p-3"><b>C. AI 영상 매뉴얼</b><br><span class="text-slate-600">회사 제공 (5/29 결산)</span></div>
+              <div class="bg-white rounded p-3"><b>D. 대행 = D-Day만</b><br><span class="text-slate-600">나머지 대행 안 함</span></div>
+            </div>
+          </div>
+
+          <div class="bg-amber-50 rounded-lg p-5 border border-amber-200">
+            <div class="font-semibold text-sm text-amber-900 mb-3">④ 개인 의미와 보상</div>
+            <div class="text-xs font-semibold text-amber-900 mb-2">열정 지점 (5/29 1:1 답)</div>
+            <ul class="text-xs text-amber-800 space-y-1 mb-3">
+              <li>① 콘텐츠 시스템 설계 — 양산 → 설계자 승격</li>
+              <li>② AI 영상으로 진화 — D-Day 롱폼·숏폼 시드</li>
+              <li>③ 후배 코칭 (경민) — 1순위</li>
+            </ul>
+            <div class="grid grid-cols-3 gap-2 text-xs mt-3">
+              <div class="bg-white rounded p-3"><b>기본급</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+              <div class="bg-white rounded p-3"><b>성과급</b><br><span class="text-slate-600">50 → 70만원 + 분기 KPI</span></div>
+              <div class="bg-white rounded p-3"><b>복리후생</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+            </div>
+            <div class="text-xs text-slate-500 mt-3 pt-3 border-t border-amber-200">서명: 작성자(형진) ____________ · 송정익 ____________ · 김경록 ____________</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 경민 -->
+      <div class="person-content" id="person-kyungmin" style="display:none">
+        <div class="card bg-white rounded-2xl p-6 border border-slate-200">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <div class="font-bold text-2xl">경민</div>
+              <div class="text-sm text-slate-600 mt-1">블로그 정리 (CCO 3-1, 형진 직속)</div>
+            </div>
+            <span class="badge bg-emerald-100 text-emerald-700">합의 100%</span>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">① 책임조직도 내 기능과 역할</div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>존재 이유</b><br>
+              <span class="text-slate-600">형진의 블로그 양산을 보조하면서 본업 2가지를 완벽 숙지해서 독립 작업 가능한 사람이 된다</span>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>책임 영역</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>· 카페바이럴 작성 (형진 가이드)</li>
+                <li>· 블로그 사진 정리·원고 보조</li>
+                <li>· AI 자동 파일링 시스템 활용</li>
+              </ul>
+            </div>
+            <div class="bg-white rounded p-3 text-xs mb-3">
+              <b>핵심 숫자 (KPI 2축 = 본업 완벽 숙지)</b>
+              <ul class="mt-2 space-y-1 text-slate-600">
+                <li>① <b>블로그 사진 정리 완벽 숙지</b> → 자율 처리 100% (형진 검수 없이)</li>
+                <li>② <b>카페바이럴 업무 완벽 숙지</b> → 자율 작성 100% (형진 검수 없이)</li>
+              </ul>
+            </div>
+            <div class="bg-amber-50 rounded p-3 mt-3 text-xs border border-amber-200">
+              <b class="text-amber-900">분기 목표 Q3</b>
+              <ul class="mt-2 space-y-1 text-amber-800">
+                <li>① 블로그 사진 정리 = 자율 처리 100% 도달</li>
+                <li>② 카페바이럴 작성 = 자율 작성 100% 도달</li>
+                <li>③ 형진 검수 없이 독립 작업 가능한 단계 진입</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 rounded-lg p-5 mb-4">
+            <div class="font-semibold text-sm text-slate-700 mb-3">② 직무 역량 및 자원</div>
+            <div class="space-y-2 text-xs">
+              <div class="bg-white rounded p-3">☐ 기술적 역량 — 입문 단계, 학습 의지?</div>
+              <div class="bg-white rounded p-3">☐ 심리적 역량 — 신규 합류 안정 + 형진 가이드?</div>
+              <div class="bg-white rounded p-3">☐ 시간적 자원 — 학습 + 본업 시간 관리?</div>
+            </div>
+            <div class="text-xs font-semibold text-slate-700 mt-4 mb-2">회사가 보장하는 자원</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-white rounded p-3"><b>A. 형진 직속 교육</b><br><span class="text-slate-600">1순위 (5/29 결산)</span></div>
+              <div class="bg-white rounded p-3"><b>B. AI 자동 파일링 도구</b><br><span class="text-slate-600">회사 부담</span></div>
+              <div class="bg-white rounded p-3"><b>C. 학습 시간 보장</b><br><span class="text-slate-600">입문 단계 안정화</span></div>
+              <div class="bg-white rounded p-3"><b>D. 작성·정리 매뉴얼</b><br><span class="text-slate-600">형진 작성</span></div>
+            </div>
+          </div>
+
+          <div class="bg-amber-50 rounded-lg p-5 border border-amber-200">
+            <div class="font-semibold text-sm text-amber-900 mb-3">④ 개인 의미와 보상</div>
+            <div class="text-xs font-semibold text-amber-900 mb-2">열정 지점 (시드 = 1:1 확인 필요)</div>
+            <ul class="text-xs text-amber-800 space-y-1 mb-3">
+              <li>① 안정적 학습 환경 — 형진 직속 = 명확한 가이드</li>
+              <li>② 형진과의 라인 — 신뢰 기반 협업</li>
+              <li>③ 자산화 누적 보람</li>
+            </ul>
+            <div class="grid grid-cols-3 gap-2 text-xs mt-3">
+              <div class="bg-white rounded p-3"><b>기본급</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+              <div class="bg-white rounded p-3"><b>성과급</b><br><span class="text-slate-600">신규 입사자 + 분기 KPI</span></div>
+              <div class="bg-white rounded p-3"><b>복리후생</b><br><span class="text-slate-600">사내 규칙·평가</span></div>
+            </div>
+            <div class="text-xs text-slate-500 mt-3 pt-3 border-t border-amber-200">서명: 작성자(경민) ____________ · 송정익 ____________ · 김경록 ____________</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-blue-50 rounded-xl p-4 border border-blue-200 text-xs text-blue-900 mt-5">
+        💾 docx 원본 = <code class="bg-white px-2 py-0.5 rounded">03-projects/content-team-position-charters/</code> 폴더 (= 1:1 시 출력해서 같이 보고 서명)
+      </div>
+    </section>
+
+    <!-- 계기판 -->
+    <section id="dashboard" class="section">
+      <h1 class="text-3xl font-bold mb-2">계기판</h1>
+      <div class="text-slate-500 mb-8">짱돌 진척 + 핵심 지표 · 매주 입력 → 그래프 자동</div>
+
+      <!-- 짱돌 진척 -->
+      <h2 class="text-lg font-bold mb-3 text-slate-700">🪨 분기 짱돌 진척 (%)</h2>
+      <div class="grid grid-cols-2 gap-4 mb-8">
+
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <div class="font-bold text-sm">① 운영 매뉴얼 v1</div>
+              <div class="text-xs text-slate-500">주인: 송정익 + 진선</div>
+            </div>
+            <div class="text-2xl font-bold" id="K1-val">-</div>
+          </div>
+          <input type="number" class="kpi-input mb-2" data-kpi="K1" data-target="100" placeholder="진척률 0~100" min="0" max="100">
+          <div class="gauge-wrap"><div class="gauge-bar" id="K1-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <div class="font-bold text-sm">② 브랜딩 패키지 v1</div>
+              <div class="text-xs text-slate-500">주인: 송정익 + 디자이너</div>
+            </div>
+            <div class="text-2xl font-bold" id="K2-val">-</div>
+          </div>
+          <input type="number" class="kpi-input mb-2" data-kpi="K2" data-target="100" placeholder="진척률 0~100" min="0" max="100">
+          <div class="gauge-wrap"><div class="gauge-bar" id="K2-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <div class="font-bold text-sm">③ 콘텐츠 스터디 시스템</div>
+              <div class="text-xs text-slate-500">주인: 송정익 + 김경록</div>
+            </div>
+            <div class="text-2xl font-bold" id="K3-val">-</div>
+          </div>
+          <input type="number" class="kpi-input mb-2" data-kpi="K3" data-target="100" placeholder="진척률 0~100" min="0" max="100">
+          <div class="gauge-wrap"><div class="gauge-bar" id="K3-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <div class="font-bold text-sm">④ AI 사진 정리 시스템</div>
+              <div class="text-xs text-slate-500">주인: 김경록</div>
+            </div>
+            <div class="text-2xl font-bold" id="K4-val">-</div>
+          </div>
+          <input type="number" class="kpi-input mb-2" data-kpi="K4" data-target="100" placeholder="진척률 0~100" min="0" max="100">
+          <div class="gauge-wrap"><div class="gauge-bar" id="K4-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <div class="font-bold text-sm">⑤ 삼성아이웰 네트워크 총괄·운영</div>
+              <div class="text-xs text-slate-500">주인: 송정익</div>
+            </div>
+            <div class="text-2xl font-bold" id="K5-val">-</div>
+          </div>
+          <input type="number" class="kpi-input mb-2" data-kpi="K5" data-target="100" placeholder="진척률 0~100" min="0" max="100">
+          <div class="gauge-wrap"><div class="gauge-bar" id="K5-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border-2 border-violet-200">
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <div class="font-bold text-sm">⑥ GEO 시스템 상품화</div>
+              <div class="text-xs text-slate-500">주인: 김경록</div>
+            </div>
+            <div class="text-2xl font-bold" id="K6-val">-</div>
+          </div>
+          <input type="number" class="kpi-input mb-2" data-kpi="K6" data-target="100" placeholder="진척률 0~100" min="0" max="100">
+          <div class="gauge-wrap"><div class="gauge-bar" id="K6-bar" style="width:0%"></div></div>
+        </div>
+
+      </div>
+
+      <!-- 핵심 지표 (매주) -->
+      <h2 class="text-lg font-bold mb-3 text-slate-700">📅 매주 핵심 지표</h2>
+      <div class="grid grid-cols-3 gap-4 mb-6">
+
+        <div class="card bg-white rounded-xl p-4 border border-slate-200">
+          <div class="text-xs text-slate-500">위탁 병원 매출 (만원)</div>
+          <div class="flex justify-between items-end mt-1">
+            <div class="font-bold text-xs">에이블 등 합산</div>
+            <div class="text-xl font-bold" id="W1-val">-</div>
+          </div>
+          <input type="number" class="kpi-input my-2" data-kpi="W1" data-target="2000" placeholder="이번 주 합산">
+          <div class="gauge-wrap"><div class="gauge-bar" id="W1-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-4 border border-slate-200">
+          <div class="text-xs text-slate-500">콘텐츠 발행 수 (주간)</div>
+          <div class="flex justify-between items-end mt-1">
+            <div class="font-bold text-xs">블로그+카페+SNS</div>
+            <div class="text-xl font-bold" id="W2-val">-</div>
+          </div>
+          <input type="number" class="kpi-input my-2" data-kpi="W2" data-target="50" placeholder="이번 주 발행">
+          <div class="gauge-wrap"><div class="gauge-bar" id="W2-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-4 border border-slate-200">
+          <div class="text-xs text-slate-500">콘텐츠 스터디 (주간)</div>
+          <div class="flex justify-between items-end mt-1">
+            <div class="font-bold text-xs">진행 회차</div>
+            <div class="text-xl font-bold" id="W3-val">-</div>
+          </div>
+          <input type="number" class="kpi-input my-2" data-kpi="W3" data-target="1" placeholder="이번 주 회차" min="0">
+          <div class="gauge-wrap"><div class="gauge-bar" id="W3-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-4 border border-slate-200">
+          <div class="text-xs text-slate-500">신규 영업 미팅 (주간)</div>
+          <div class="flex justify-between items-end mt-1">
+            <div class="font-bold text-xs">500+ 케이스</div>
+            <div class="text-xl font-bold" id="W4-val">-</div>
+          </div>
+          <input type="number" class="kpi-input my-2" data-kpi="W4" data-target="2" placeholder="이번 주 미팅">
+          <div class="gauge-wrap"><div class="gauge-bar" id="W4-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-4 border border-slate-200">
+          <div class="text-xs text-slate-500">자산화 항목 (주간)</div>
+          <div class="flex justify-between items-end mt-1">
+            <div class="font-bold text-xs">슬랙 정리 건수</div>
+            <div class="text-xl font-bold" id="W5-val">-</div>
+          </div>
+          <input type="number" class="kpi-input my-2" data-kpi="W5" data-target="5" placeholder="이번 주 누적">
+          <div class="gauge-wrap"><div class="gauge-bar" id="W5-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-4 border border-slate-200">
+          <div class="text-xs text-slate-500">위탁 병원 만족도 (10점)</div>
+          <div class="flex justify-between items-end mt-1">
+            <div class="font-bold text-xs">원장 피드백</div>
+            <div class="text-xl font-bold" id="W6-val">-</div>
+          </div>
+          <input type="number" class="kpi-input my-2" data-kpi="W6" data-target="10" placeholder="이번 주 평균" min="0" max="10" step="0.1">
+          <div class="gauge-wrap"><div class="gauge-bar" id="W6-bar" style="width:0%"></div></div>
+        </div>
+
+      </div>
+
+      <!-- 스냅샷 + 차트 -->
+      <div class="card bg-white rounded-2xl p-6 border-2 border-blue-200 mb-6">
+        <div class="flex justify-between items-start mb-2">
+          <div>
+            <h2 class="text-lg font-bold text-slate-700">📈 매주 스냅샷 추세</h2>
+            <div class="text-xs text-slate-500 mt-1">매주 월요일 회의 시 = 입력 후 "이번 주 스냅샷 저장" 클릭</div>
+          </div>
+          <button onclick="saveSnapshot()" class="text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded border border-blue-200 hover:bg-blue-100 font-semibold">📅 이번 주 스냅샷 저장</button>
+        </div>
+
+        <div class="mt-5">
+          <div class="bg-slate-50 rounded-lg p-3 border border-slate-200" style="height: 280px;">
+            <canvas id="chart-weekly"></canvas>
+          </div>
+          <div class="flex justify-between items-center mt-3">
+            <div class="text-xs text-slate-500">최근 12주 히스토리</div>
+            <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-rose-600">전체 삭제</button>
+          </div>
+          <div id="history-list" class="space-y-2 max-h-64 overflow-y-auto mt-3"></div>
+        </div>
+      </div>
+
+      <div class="card bg-amber-50 rounded-xl p-4 border border-amber-200 text-xs text-amber-800">
+        💡 <b>운영 흐름</b>: 매주 월요일 주간 회의 시 = 짱돌 진척 6개 + 핵심 지표 6개 입력 → "이번 주 스냅샷 저장" → 추세 자동 그래프 / 미달만 검토 (BOS 룰)
+      </div>
+    </section>
+
+    <!-- 분기 짱돌 -->
+    <section id="rocks" class="section">
+      <h1 class="text-3xl font-bold mb-2">2026 Q3 분기 짱돌</h1>
+      <div class="text-slate-500 mb-8">7/1 ~ 9/30 · 90일 · 전사 6개 + 자율 룰 2개 · 6/25 1:1 반영</div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">🪨 전사 짱돌 6개</h2>
+      <div class="space-y-3 mb-8">
+
+        <div class="card bg-white rounded-xl p-5 border-2 border-orange-300 flex items-start gap-4">
+          <div class="text-2xl font-bold text-orange-600 w-12 mt-1">①</div>
+          <div class="flex-1">
+            <div class="font-semibold">위탁 병원 운영 매뉴얼 v1 완성</div>
+            <div class="text-xs text-slate-600 mt-2">위탁 병원 원내 운영(HR·교육·DB) 표준화 = 신규 위탁 시 즉시 적용 = 프랜차이즈 시드</div>
+            <div class="text-xs mt-2 flex gap-2">
+              <span class="badge bg-slate-900 text-white">정 : 송정익 + 진선</span>
+              <span class="badge bg-slate-200 text-slate-700">부 : 김경록 (자산화 정리)</span>
+              <span class="badge bg-amber-100 text-amber-800">마감 9/30</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border-2 border-green-300 flex items-start gap-4">
+          <div class="text-2xl font-bold text-green-600 w-12 mt-1">②</div>
+          <div class="flex-1">
+            <div class="font-semibold">위탁 병원 표준 브랜딩 패키지 v1</div>
+            <div class="text-xs text-slate-600 mt-2">팜플렛 5종 (과목별) + 이벤트 가이드 (개원·정기·시즌) + 환자 선물 기준·발주 + 홈페이지 시각 가이드</div>
+            <div class="text-xs mt-2 flex gap-2">
+              <span class="badge bg-slate-900 text-white">정 : 송정익</span>
+              <span class="badge bg-slate-200 text-slate-700">부 : 디자이너 1</span>
+              <span class="badge bg-amber-100 text-amber-800">마감 9/30</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border-2 border-pink-300 flex items-start gap-4">
+          <div class="text-2xl font-bold text-pink-600 w-12 mt-1">③</div>
+          <div class="flex-1">
+            <div class="font-semibold">콘텐츠 스터디 시스템 만들기 🆕</div>
+            <div class="text-xs text-slate-600 mt-2">
+              <b>7월</b> = 주 1회 시작 → 한 달간 횟수 파악<br>
+              <b>8월</b> = 시스템화<br>
+              <b>9월</b> = 적용 (10월부터 정기 운영)<br>
+              <span class="text-blue-700">+ GEO 공부 통합 (상품화 X = 실력 쌓기)</span>
+            </div>
+            <div class="text-xs mt-2 flex gap-2">
+              <span class="badge bg-slate-900 text-white">정 : 김경록</span>
+              <span class="badge bg-slate-200 text-slate-700">4인: 회장·정희·진선·형진 (6/25 변경)</span>
+              <span class="badge bg-amber-100 text-amber-800">마감 9/30 정착</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border-2 border-blue-300 flex items-start gap-4">
+          <div class="text-2xl font-bold text-blue-600 w-12 mt-1">④</div>
+          <div class="flex-1">
+            <div class="font-semibold">AI 사진 정리 시스템 (코워크) 🆕</div>
+            <div class="text-xs text-slate-600 mt-2">
+              <b>6/30 = 코워크 100% 동작 확인 완료</b> / 보완 진행 중<br>
+              마지막 검수 = 사람 / GIF 미리 많이 만들어 놓기<br>
+              <span class="text-blue-700">→ 형진·진선 백로그 해소 / 사진 정리 분산</span>
+            </div>
+            <div class="text-xs mt-2 flex gap-2">
+              <span class="badge bg-slate-900 text-white">정 : 김경록</span>
+              <span class="badge bg-slate-200 text-slate-700">부 : 검수자</span>
+              <span class="badge bg-amber-100 text-amber-800">마감 9/30</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card bg-white rounded-xl p-5 border-2 border-rose-300 flex items-start gap-4">
+          <div class="text-2xl font-bold text-rose-600 w-12 mt-1">⑤</div>
+          <div class="flex-1">
+            <div class="font-semibold">삼성아이웰 네트워크 총괄 및 운영 시작 🆕</div>
+            <div class="text-xs text-slate-600 mt-2">
+              <b>사전 액션</b>: 6/23(월) 또는 6/24(화) 방문 = MSO+CSO 통합 안 가지고 가서 먼저 받기<br>
+              <b>안 구조 (3~4장 PPT)</b>: ① 수익 구조 (MSO+CSO) → ② 브랜딩 안 → ③ 네트워크 비전<br>
+              <b>목표</b>: 총괄 계약 체결 + 운영 본격 시작
+            </div>
+            <div class="text-xs mt-2 flex gap-2">
+              <span class="badge bg-slate-900 text-white">정 : 송정익</span>
+              <span class="badge bg-rose-100 text-rose-800">🔥 빠른 진행</span>
+              <span class="badge bg-amber-100 text-amber-800">마감 9/30</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card bg-white rounded-xl p-5 border-2 border-violet-300 flex items-start gap-4 mb-8">
+        <div class="text-2xl font-bold text-violet-600 w-12 mt-1">⑥</div>
+        <div class="flex-1">
+          <div class="font-semibold">GEO 시스템 상품화 🆕</div>
+          <div class="text-xs text-slate-600 mt-2">
+            GEO (생성형 AI 노출) = 매뉴얼·시스템화 → 위탁 병원에 적용 가능한 상품 형태로 정리<br>
+            <span class="text-violet-700">→ MSO 안에 껴주는 핵심 무기 / 콘텐츠 스터디와 연계</span>
+          </div>
+          <div class="text-xs mt-2 flex gap-2">
+            <span class="badge bg-slate-900 text-white">정 : 김경록</span>
+            <span class="badge bg-slate-200 text-slate-700">부 : 전원 (스터디)</span>
+            <span class="badge bg-amber-100 text-amber-800">마감 9/30</span>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">🟡 자율 룰 (= 짱돌 아님)</h2>
+      <div class="space-y-3 mb-8">
+
+        <div class="card bg-slate-50 rounded-xl p-5 border border-slate-200">
+          <div class="font-semibold mb-2">📌 신규 영업 = 500+ 케이스 룰</div>
+          <ul class="text-xs text-slate-600 space-y-1">
+            <li>· 의원급 = 거부</li>
+            <li>· 500만+ = 케이스 바이 케이스</li>
+            <li>· MSO 가능성 = 무조건 받음</li>
+            <li>· 작은 매출 안 따라가기</li>
+          </ul>
+        </div>
+
+        <div class="card bg-slate-50 rounded-xl p-5 border border-slate-200">
+          <div class="font-semibold mb-2">📌 GEO 학습 = 실력 쌓기</div>
+          <ul class="text-xs text-slate-600 space-y-1">
+            <li>· 상품화 X (대행으로 안 갈 거니까)</li>
+            <li>· MSO 안에 껴주기 위한 실력</li>
+            <li>· 콘텐츠 스터디와 통합 운영</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="card bg-amber-50 rounded-xl p-5 border-2 border-amber-300">
+        <div class="font-semibold text-amber-900 mb-2">⚠️ 매주 진척 점검 = 13주</div>
+        <div class="text-sm text-amber-800">7월 ~ 9월 매주 월요일 회의 = 미달 짱돌만 검토 / 🟢 정상 / 🟡 주의 / 🔴 미달</div>
+        <div class="text-sm text-amber-900 font-semibold mt-2">★ 45일차 중간 점검 = 8/11 ~ 8/17</div>
+      </div>
+    </section>
+
+    <!-- 회의 운영 -->
+    <section id="meeting" class="section">
+      <h1 class="text-3xl font-bold mb-2">회의 운영</h1>
+      <div class="text-slate-500 mb-8">주간 회의 룰 + 컴플레인 통합</div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">🗓️ 주간 회의 룰</h2>
+      <div class="card bg-white rounded-xl p-6 border-2 border-blue-200 mb-6">
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="bg-blue-50 rounded p-3"><b class="text-blue-900">시점</b><br><span class="text-slate-700">매주 월요일</span></div>
+          <div class="bg-blue-50 rounded p-3"><b class="text-blue-900">진행</b><br><span class="text-slate-700">송정익 + 김경록 (공동)</span></div>
+          <div class="bg-blue-50 rounded p-3 col-span-2"><b class="text-blue-900">안건</b><br><span class="text-slate-700"><b>핵심 짱돌만</b> 점검 (작은 사소한 일 X) / 계기판으로 진척 + 막힌 이유 + 해결법</span></div>
+          <div class="bg-amber-50 rounded p-3 col-span-2 border border-amber-200"><b class="text-amber-900">⭐ 컴플레인 통합 룰</b><br><span class="text-amber-800">그때그때 X = 주간 회의에서 한 번에 = 감정 안 상함 + 기록 남음<br><span class="italic">"이때 이런 얘기를 다 하는 자리다"</span></span></div>
+        </div>
+      </div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">📆 매월 1일 계기판 회의 (신규 · 6/25 결정)</h2>
+      <div class="card bg-white rounded-xl p-6 border-2 border-emerald-200 mb-6">
+        <div class="text-sm space-y-2">
+          <div>· <b>진행</b>: 성지수 (양산 라인 매니저)</div>
+          <div>· <b>안건</b>: 지난달 KPI 결과 + 이번 달 목표 + 미달 원인</div>
+          <div>· <b>1회차</b>: 8/1 (7/1 = 1회차 건너뜀)</div>
+        </div>
+      </div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">⚙️ 운영 문화 룰 7가지 (6/25 1:1 결정)</h2>
+      <div class="grid grid-cols-2 gap-3 text-xs text-slate-700 mb-4">
+        <div class="bg-white rounded p-3 border border-slate-200"><b>1. 사담·잡담 늘리기</b> — 양 팀 모두 적용</div>
+        <div class="bg-white rounded p-3 border border-slate-200"><b>2. 카톡 잡담 OK / 슬랙 = 업무</b></div>
+        <div class="bg-white rounded p-3 border border-slate-200"><b>3. 식대 = 같은 공간</b> — 그루핑 OK, 따로 X</div>
+        <div class="bg-white rounded p-3 border border-slate-200"><b>4. 선물 사오지 마라 룰</b> — 부담 X</div>
+        <div class="bg-white rounded p-3 border border-slate-200"><b>5. 여름 휴가 = 별도 X</b> — 개인 연차로</div>
+        <div class="bg-white rounded p-3 border border-slate-200"><b>6. 임신 시 = 4주차 즉시 보고</b> — 대체자 채용 시간 확보</div>
+        <div class="bg-white rounded p-3 border border-amber-300 bg-amber-50 col-span-2"><b>7. ⭐ 회장 거쳐서 가라</b> — 정희 ↔ 실무 (진선·형진) = 회장이 쿠션 (조정 또는 거절)</div>
+      </div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">💬 진선·유빈 "영혼의 듀오" 인정</h2>
+      <div class="card bg-violet-50 rounded-xl p-4 border border-violet-200 text-xs text-violet-800 mb-4">
+        진선·유빈 = 영혼의 듀오 인정. 다른 직원(준희·경민)과도 의견 교환 확장 요청.
+      </div>
+    </section>
+
+    <!-- 자산화 시스템 -->
+    <section id="assets" class="section">
+      <h1 class="text-3xl font-bold mb-2">자산화 시스템</h1>
+      <div class="text-slate-500 mb-8">머릿속 노하우 → 슬랙 정리 → 매뉴얼화 / 사람 나가도 남음</div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">🔄 자산화 흐름</h2>
+      <div class="card bg-white rounded-2xl p-6 border-2 border-emerald-200 mb-6">
+        <div class="text-sm space-y-3">
+          <div class="bg-emerald-50 rounded-lg p-4">
+            <b class="text-emerald-900">[1] 머릿속 노하우</b> = 정익 / 진선 / 경록 (콘텐츠 공사장·엘리베이터·층수 안내·원내 디테일 등)
+          </div>
+          <div class="text-center text-2xl text-slate-400">↓</div>
+          <div class="bg-emerald-50 rounded-lg p-4">
+            <b class="text-emerald-900">[2] 안 만들기</b> = 정익 + 진선 (+ 정희 등) 머릿속 짧게 정리
+          </div>
+          <div class="text-center text-2xl text-slate-400">↓</div>
+          <div class="bg-emerald-50 rounded-lg p-4">
+            <b class="text-emerald-900">[3] 경록과 회의</b> = 짧게 = 슬랙 / 1:1
+          </div>
+          <div class="text-center text-2xl text-slate-400">↓</div>
+          <div class="bg-emerald-50 rounded-lg p-4">
+            <b class="text-emerald-900">[4] AI로 빠르게 정리</b> = 슬랙 누적
+          </div>
+          <div class="text-center text-2xl text-slate-400">↓</div>
+          <div class="bg-emerald-50 rounded-lg p-4">
+            <b class="text-emerald-900">[5] 분기 단위 통합</b> = 본 OS HTML 매뉴얼 갱신 / 사람 나가도 남음
+          </div>
+        </div>
+      </div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">📝 회의록 자동화</h2>
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="text-xs text-slate-500 mb-2">1️⃣</div>
+          <div class="font-bold mb-2">녹음</div>
+          <div class="text-xs text-slate-600">모든 회의 = 녹음 / 폰 또는 슬랙 콜</div>
+        </div>
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="text-xs text-slate-500 mb-2">2️⃣</div>
+          <div class="font-bold mb-2">경록이 정리</div>
+          <div class="text-xs text-slate-600">AI로 빠르게 → 슬랙 채널</div>
+        </div>
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="text-xs text-slate-500 mb-2">3️⃣</div>
+          <div class="font-bold mb-2">OS 갱신</div>
+          <div class="text-xs text-slate-600">중요 결정 = 본 페이지에 반영</div>
+        </div>
+      </div>
+
+      <h2 class="text-lg font-bold mb-3 text-slate-700">🎁 기존 자산 (복제 가능)</h2>
+      <div class="space-y-3">
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="font-semibold">형진 + 진선 블로그 프로세스</div>
+          <div class="text-xs text-slate-500 mt-1">이미 만들어 놓음 → 누나(예우)에게 보여주고 복제</div>
+        </div>
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="font-semibold">에이블 콘텐츠 공사장 디테일</div>
+          <div class="text-xs text-slate-500 mt-1">정익 기획 / 운영에 녹이고 있음 → 매뉴얼화 시드</div>
+        </div>
+        <div class="card bg-white rounded-xl p-5 border border-slate-200">
+          <div class="font-semibold">원내 디테일 (엘리베이터 번호판·층수별 안내문 등)</div>
+          <div class="text-xs text-slate-500 mt-1">진선 머릿속 → 운영 매뉴얼 v1에 박힐 예정</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // 네비게이션
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const target = item.dataset.target;
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      item.classList.add('active');
+      document.getElementById(target).classList.add('active');
+      window.scrollTo(0, 0);
+    });
+  });
+
+  // 인터랙티브 계기판
+  const STORAGE_KEY = 'content-team-kpi-v1';
+
+  function loadKPI() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch(e) { return {}; }
+  }
+  function saveKPI(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+  function updateGauge(kpi, value, target) {
+    const pct = Math.min(150, (value / target) * 100);
+    const bar = document.getElementById(kpi + '-bar');
+    const valEl = document.getElementById(kpi + '-val');
+    if (bar) {
+      bar.style.width = Math.min(100, pct) + '%';
+      bar.classList.remove('low', 'mid', 'high');
+      if (pct < 50) bar.classList.add('low');
+      else if (pct < 80) bar.classList.add('mid');
+      else bar.classList.add('high');
+    }
+    if (valEl) valEl.textContent = value || '-';
+  }
+
+  function initKPI() {
+    const data = loadKPI();
+    document.querySelectorAll('input[data-kpi]').forEach(input => {
+      const kpi = input.dataset.kpi;
+      const target = parseFloat(input.dataset.target);
+      if (data[kpi] !== undefined) {
+        input.value = data[kpi];
+        updateGauge(kpi, parseFloat(data[kpi]), target);
+      }
+      input.addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value) || 0;
+        data[kpi] = v;
+        saveKPI(data);
+        updateGauge(kpi, v, target);
+      });
+    });
+  }
+  initKPI();
+
+  // 인물 탭
+  document.querySelectorAll('.person-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const person = tab.dataset.person;
+      document.querySelectorAll('.person-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.person-content').forEach(c => c.style.display = 'none');
+      tab.classList.add('active');
+      document.getElementById('person-' + person).style.display = 'block';
+    });
+  });
+
+  // 히스토리 + 차트
+  const HISTORY_KEY = 'content-team-history-v1';
+  let chartWeekly = null;
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+    catch(e) { return []; }
+  }
+
+  function saveSnapshot() {
+    const data = loadKPI();
+    if (Object.keys(data).length === 0) { alert('입력된 수치가 없습니다.'); return; }
+    const history = loadHistory();
+    const label = prompt('주차 라벨을 입력하세요 (예: W27)', 'W' + (27 + history.length));
+    if (!label) return;
+    history.push({ label, data: {...data} });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    renderHistory();
+  }
+
+  function clearHistory() {
+    if (!confirm('히스토리를 모두 지웁니다.')) return;
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
+  }
+
+  function renderChart() {
+    const history = loadHistory();
+    const ctx = document.getElementById('chart-weekly');
+    if (!ctx) return;
+    const keys = [
+      ['K1','① 운영 매뉴얼','#f97316'],
+      ['K2','② 브랜딩 패키지','#10b981'],
+      ['K3','③ 콘텐츠 스터디','#ec4899'],
+      ['K4','④ AI 사진 정리','#3b82f6'],
+      ['K5','⑤ 삼성아이웰','#ef4444'],
+      ['K6','⑥ GEO 시스템','#8b5cf6'],
+    ];
+    const data = history.slice(-12);
+    const labels = data.map(h => h.label);
+    const datasets = keys.map(([k, label, color]) => ({
+      label, data: data.map(h => h.data[k] ?? null),
+      borderColor: color, backgroundColor: color + '20',
+      tension: 0.3, borderWidth: 2, pointRadius: 4
+    }));
+    if (chartWeekly) chartWeekly.destroy();
+    chartWeekly = new Chart(ctx, {
+      type: 'line', data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } } },
+        scales: { y: { beginAtZero: true, max: 100, grid: { color: '#e2e8f0' } }, x: { grid: { display: false } } }
+      }
+    });
+  }
+
+  function renderHistory() {
+    const history = loadHistory();
+    const box = document.getElementById('history-list');
+    if (box) {
+      box.innerHTML = history.length === 0
+        ? '<div class="text-xs text-slate-500 p-3">아직 저장된 스냅샷이 없습니다. 입력 후 "이번 주 스냅샷 저장" 버튼을 누르세요.</div>'
+        : history.slice(-12).map(h => `
+          <div class="bg-white rounded-lg p-3 border border-slate-200 text-xs">
+            <div class="font-semibold mb-2">${h.label}</div>
+            <div class="grid grid-cols-6 gap-2 text-xs">
+              ${['K1','K2','K3','K4','K5','K6'].map(k => `<div><div class="text-slate-400">${k}</div><div class="font-semibold">${h.data[k] ?? '-'}%</div></div>`).join('')}
+            </div>
+          </div>`).join('');
+    }
+    renderChart();
+  }
+  renderHistory();
+</script>
+
+</body>
+</html>

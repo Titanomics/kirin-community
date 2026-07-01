@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import CommerceVision from './CommerceVision';
-import ContentVision from './ContentVision';
 
 type Team = '커머스팀' | '콘텐츠팀';
 
@@ -27,11 +25,13 @@ export default function TeamVisionPage() {
     );
   }
 
+  const src = effectiveTeam === '커머스팀' ? '/team-vision/commerce.html' : '/team-vision/content.html';
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between rounded-lg bg-white p-4 shadow">
-        <h1 className="text-2xl font-bold text-gray-900">{effectiveTeam} 비전</h1>
-        {isAdmin && (
+      {isAdmin && (
+        <div className="flex items-center justify-between rounded-lg bg-white p-4 shadow">
+          <h1 className="text-2xl font-bold text-gray-900">팀 비전</h1>
           <div className="flex gap-2">
             {(['커머스팀', '콘텐츠팀'] as Team[]).map((t) => (
               <button
@@ -45,9 +45,15 @@ export default function TeamVisionPage() {
               </button>
             ))}
           </div>
-        )}
-      </div>
-      {effectiveTeam === '커머스팀' ? <CommerceVision /> : <ContentVision />}
+        </div>
+      )}
+      <iframe
+        key={src}
+        src={src}
+        title={`${effectiveTeam} 비전`}
+        className="w-full rounded-lg bg-white shadow"
+        style={{ height: 'calc(100vh - 140px)', border: 0 }}
+      />
     </div>
   );
 }
