@@ -1288,7 +1288,7 @@
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
     catch(e) { return {}; }
   }
-  function saveKPI(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+  function saveKPI(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); gaugeSaveToServer(); }
 
   function updateGauge(kpi, value, target) {
     const pct = Math.min(150, (value / target) * 100);
@@ -1352,12 +1352,14 @@
     history.push({ label, data: {...data} });
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     renderHistory();
+    gaugeSaveToServer();
   }
 
   function clearHistory() {
     if (!confirm('히스토리를 모두 지웁니다.')) return;
     localStorage.removeItem(HISTORY_KEY);
     renderHistory();
+    gaugeSaveToServer();
   }
 
   function renderChart() {
@@ -1407,7 +1409,30 @@
     }
     renderChart();
   }
-  renderHistory();
+  // ── 서버(Supabase) 저장 연동 ──
+  const GAUGE_TEAM = '콘텐츠팀';
+  let _gaugeTimer = null;
+  function gaugePayload() {
+    let kpi = {}, history = null;
+    try { kpi = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e){}
+    try { history = JSON.parse(localStorage.getItem(HISTORY_KEY) || 'null'); } catch(e){}
+    return { kpi, history };
+  }
+  async function gaugeSaveNow() {
+    try {
+      await fetch('/api/team-gauge', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ team: GAUGE_TEAM, payload: gaugePayload() }) });
+    } catch(e){}
+  }
+  function gaugeSaveToServer() { clearTimeout(_gaugeTimer); _gaugeTimer = setTimeout(gaugeSaveNow, 700); }
+  async function gaugeSyncFromServer() {
+    try {
+      const r = await fetch('/api/team-gauge?team=' + encodeURIComponent(GAUGE_TEAM));
+      const j = await r.json(); const p = j.payload || {};
+      if (p.kpi) localStorage.setItem(STORAGE_KEY, JSON.stringify(p.kpi));
+      if (p.history) localStorage.setItem(HISTORY_KEY, JSON.stringify(p.history));
+    } catch(e){}
+  }
+  (async () => { await gaugeSyncFromServer(); initKPI(); renderHistory(); })();
 </script>
 
 </body>
