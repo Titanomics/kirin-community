@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client';
 import { Clock, LogIn, LogOut, CheckCircle, AlertCircle, Wifi, WifiOff, Calendar } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isSameMonth } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import CoreValueModal from './CoreValueModal';
+import { getTodayCoreValue } from '@/lib/coreValues';
 
 interface AttendanceRecord {
   id: string;
@@ -86,6 +88,7 @@ export default function AttendancePage() {
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showCoreValue, setShowCoreValue] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // 1초마다 시간 업데이트
@@ -170,6 +173,7 @@ export default function AttendancePage() {
         return;
       }
       setTodayRecord(json.record);
+      if (action === 'check_in') setShowCoreValue(true);
       await fetchData();
     } catch {
       alert('네트워크 오류가 발생했습니다.');
@@ -237,6 +241,9 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
+      {showCoreValue && (
+        <CoreValueModal value={getTodayCoreValue()} onClose={() => setShowCoreValue(false)} />
+      )}
       {/* 헤더: 현재 시간 + IP 상태 */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
