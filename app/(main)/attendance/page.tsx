@@ -7,7 +7,7 @@ import { Clock, LogIn, LogOut, CheckCircle, AlertCircle, Wifi, WifiOff, Calendar
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, isSameMonth } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import CoreValueModal from './CoreValueModal';
-import { getTodayCoreValue } from '@/lib/coreValues';
+import { getTodayCoreValue, getTodayCoreValueIndex, isGracePeriod } from '@/lib/coreValues';
 
 interface AttendanceRecord {
   id: string;
@@ -151,6 +151,16 @@ export default function AttendancePage() {
     });
   }
 
+  // 핵심가치 다짐(출근)/사례(퇴근)를 core_value_log에 저장. 비어있으면 저장 안 함(출퇴근은 그대로 진행).
+  async function saveCoreValueText(field: 'intention' | 'reflection', text: string) {
+    if (!user || !text) return;
+    const kstToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+    await supabase.from('core_value_log').upsert(
+      { user_id: user.id, date: kstToday, value_index: getTodayCoreValueIndex(), [field]: text },
+      { onConflict: 'user_id,date' }
+    );
+  }
+
   async function handleAction(action: 'check_in' | 'check_out') {
     setActionLoading(true);
     try {
@@ -244,9 +254,11 @@ export default function AttendancePage() {
         <CoreValueModal
           value={getTodayCoreValue()}
           mode={modalAction === 'check_in' ? 'checkin' : 'checkout'}
-          onConfirm={() => {
+          isGrace={isGracePeriod()}
+          onConfirm={(text) => {
             const a = modalAction;
             setModalAction(null);
+            saveCoreValueText(a === 'check_in' ? 'intention' : 'reflection', text);
             handleAction(a);
           }}
           onClose={() => setModalAction(null)}

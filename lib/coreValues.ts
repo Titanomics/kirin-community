@@ -38,3 +38,31 @@ export function getTodayCoreValueIndex(today: Date = new Date()): number {
 export function getTodayCoreValue(today: Date = new Date()): CoreValue {
   return CORE_VALUES[getTodayCoreValueIndex(today)];
 }
+
+// 특정 날짜의 핵심가치 인덱스/값 (주간 화면에서 날짜별로 조회)
+export function getCoreValueIndexForDate(date: Date): number {
+  return getTodayCoreValueIndex(date);
+}
+export function getCoreValueForDate(date: Date): CoreValue {
+  return CORE_VALUES[getTodayCoreValueIndex(date)];
+}
+
+// 계도기간: 시작일(7/1)부터 2주간 = 7/1 ~ 7/14. 이 기간엔 출첵 강제 없음, 안내만.
+export const CORE_VALUE_GRACE_END = new Date(2026, 6, 15); // 2026-07-15 00:00 (미포함)
+export function isGracePeriod(today: Date = new Date()): boolean {
+  return today < CORE_VALUE_GRACE_END;
+}
+
+// 해당 날짜가 속한 주의 평일(월~금) 날짜 배열 반환
+export function getWeekWeekdays(ref: Date = new Date()): Date[] {
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const dow = d.getDay(); // 0=일
+  const mondayOffset = dow === 0 ? -6 : 1 - dow; // 이번 주 월요일까지의 오프셋
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + mondayOffset);
+  return Array.from({ length: 5 }, (_, i) => {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    return day;
+  });
+}

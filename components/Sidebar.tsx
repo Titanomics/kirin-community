@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Clock, UserCheck, X, Target, Building2, CalendarRange, Compass } from 'lucide-react';
+import { MessageSquare, Calendar, Users, LayoutDashboard, CalendarDays, BarChart3, Shield, Clock, UserCheck, X, Target, Building2, CalendarRange, Compass, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileMenu } from '@/contexts/MobileMenuContext';
 import { useMemo, useEffect, useState } from 'react';
@@ -59,6 +59,7 @@ export default function Sidebar() {
 
     items.push({ name: 'OKR', href: '/kpi', icon: BarChart3 });
     items.push({ name: '출퇴근', href: '/attendance', icon: Clock });
+    items.push({ name: '핵심가치', href: '/core-values', icon: Sparkles });
 
     // 팀별 전용 메뉴
     const userTeam = profile?.team;
