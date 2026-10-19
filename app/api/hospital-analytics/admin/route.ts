@@ -20,9 +20,12 @@ export async function POST(request: NextRequest) {
     const data = await body(request, 8192); const access = await readAccess(); requireAdmin(access);
     if (data.action === 'create-clinic') {
       if (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 120 || typeof data.owner !== 'string' || data.owner.length > 100 || !['dentweb', 'ysarang', 'other'].includes(String(data.emr))) throw new AnalyticsError('병원명과 EMR을 확인해 주세요.', 400);
-      const result = await access.client.from('ha_clinics').insert({ name: data.name.trim(), emr: data.emr, owner: data.owner.trim(), created_by: access.user.id }).select('id').single();
+      // INSERT RETURNING runs the read policy before its STABLE clinic lookup
+      // can see the new row. Return our ID after a successful minimal insert.
+      const id = crypto.randomUUID();
+      const result = await access.client.from('ha_clinics').insert({ id, name: data.name.trim(), emr: data.emr, owner: data.owner.trim(), created_by: access.user.id });
       if (result.error) throw new AnalyticsError('병원 공간을 만들지 못했습니다.');
-      return json(result.data, 201);
+      return json({ id }, 201);
     }
     if (data.action === 'set-member') {
       if (!validId(data.clinicId) || !validId(data.userId) || !['editor', 'viewer', 'revoke'].includes(String(data.role))) throw new AnalyticsError('병원·담당자·권한을 확인해 주세요.', 400);

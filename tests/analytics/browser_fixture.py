@@ -81,7 +81,11 @@ class Fixture(BaseHTTPRequestHandler):
                 state.update(revision=state['revision']+1,object_path=data['new_path'],sha256=data['new_sha256'])
                 return self.send(200,state['revision'])
         if table=='ha_clinics' and self.command=='POST' and profiles[uid]['role']=='admin':
-            clinic={**data,'id':str(uuid.uuid4()),'created_at':'2026-10-19T00:00:00Z'};clinics.append(clinic);states[clinic['id']]={'clinic_id':clinic['id'],'revision':0,'object_path':None,'sha256':None};return self.send(201,clinic)
+            # Measured against the real PostgreSQL policies: INSERT RETURNING
+            # checks ha_can_access before its STABLE lookup can see the new row.
+            if 'return=representation' in self.headers.get('Prefer',''):
+                return self.send(403,{'code':'42501','message':'new row violates row-level security policy for table ha_clinics'})
+            clinic={**data,'id':data.get('id') or str(uuid.uuid4()),'created_at':'2026-10-19T00:00:00Z'};clinics.append(clinic);states[clinic['id']]={'clinic_id':clinic['id'],'revision':0,'object_path':None,'sha256':None};return self.send(201,b'')
         if table=='ha_memberships' and self.command in ('POST','DELETE') and profiles[uid]['role']=='admin':
             if self.command=='POST':
                 members[:]=[m for m in members if not (m['clinic_id']==data['clinic_id'] and m['user_id']==data['user_id'])];members.append(data)

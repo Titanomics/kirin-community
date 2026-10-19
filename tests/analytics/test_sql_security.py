@@ -166,6 +166,15 @@ class SecurityTests(unittest.TestCase):
     def test_admin_cannot_forge_clinic_creator(self):
         self.denied(f"insert into public.ha_clinics(name,created_by) values('synthetic','{EDITOR}');", ADMIN)
 
+    def test_new_clinic_requires_insert_without_returning_then_separate_read(self):
+        # Characterize the live PostgREST boundary used by clinic creation:
+        # the STABLE ha_can_access lookup cannot see INSERT's new row yet.
+        clinic = '10000000-0000-4000-8000-000000000099'
+        insert = f"insert into public.ha_clinics(id,name,created_by) values('{clinic}','synthetic','{ADMIN}')"
+        self.denied(insert + ' returning id;', ADMIN)
+        self.successful(insert + f"; select id from public.ha_clinics where id='{clinic}'; select revision from public.ha_snapshots where clinic_id='{clinic}';",
+                        clinic + '\n0', ADMIN)
+
     def test_audit_only_visible_to_active_admin(self):
         self.successful("select count(*) from public.ha_audit;", 6, ADMIN)
         self.successful("select count(*) from public.ha_audit;", 0, EDITOR)

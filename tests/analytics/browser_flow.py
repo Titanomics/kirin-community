@@ -28,6 +28,17 @@ with sync_playwright() as p:
     context=authenticated(browser,ADMIN);page=context.new_page();page.set_default_timeout(90000)
     errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
     page.goto(BASE+'/hospital-analytics');expect(page.get_by_role('heading',name='병원 분석',exact=True)).to_be_visible()
+    page.get_by_role('button',name='병원 · 담당자 관리').click()
+    page.locator('input[name="name"]').fill('검증 신규 병원')
+    page.locator('input[name="owner"]').fill('합성 검증')
+    with page.expect_response(lambda r:r.url.endswith('/hospital-analytics/admin') and r.request.method=='POST') as created:
+        page.get_by_role('button',name='병원 등록',exact=True).click()
+    assert created.value.status==201,created.value.text()
+    created_id=created.value.json()['id']
+    expect(page.get_by_label('분석할 병원')).to_have_value(created_id)
+    expect(page.frame_locator('iframe').locator('#active-clinic-name')).to_have_text('검증 신규 병원')
+    page.get_by_role('button',name='병원 · 담당자 관리').click()
+    print('PASS admin creates a clinic and immediately opens the returned workspace',flush=True)
     page.get_by_label('분석할 병원').select_option(FIRST)
     frame=page.frame_locator('iframe');expect(frame.locator('#active-clinic-name')).to_have_text('검증 A 병원')
     expect(frame.locator('a[data-page="internalfinance"]')).to_have_count(0)
