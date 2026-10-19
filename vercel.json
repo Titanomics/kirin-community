@@ -1,3 +1,9 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "api/analytics_runtime.py": {
+      "maxDuration": 300,
+      "includeFiles": "analytics_runtime/**"
+    }
+  }
 }

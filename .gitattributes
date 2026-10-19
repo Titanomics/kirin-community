@@ -1,0 +1,2 @@
+# Keep vendored files byte-identical to the reviewed source-hash inventory.
+analytics_runtime/engine/** -text whitespace=trailing-space,space-before-tab,cr-at-eol

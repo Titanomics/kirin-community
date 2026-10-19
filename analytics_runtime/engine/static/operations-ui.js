@@ -1,0 +1,7 @@
+import {apiFetch} from './scope.js';
+export const $=id=>document.getElementById(id);
+export const time=value=>value?new Date(value).toLocaleString('ko-KR'):'아직 없음';
+export async function api(path,data){const response=await apiFetch(path,{cache:'no-store',...(data!==undefined?{method:'POST',headers:{'Content-Type':'application/json','X-Local-App':'dday'},body:JSON.stringify(data)}:{})});const body=await response.json();if(!response.ok){const error=Error(body.error||'이번 요청을 처리하지 못했습니다.');error.status=response.status;throw error;}return body;}
+export function panel(name,title,description,body){const el=document.createElement('section');el.id='page-'+name;el.className='page-view marketing-page bundle-page';el.hidden=true;el.innerHTML=`<div class="marketing-topline"><div><h2>${title}</h2><p>${description}</p></div><button type="button" class="button secondary" id="${name}-refresh">새로 확인</button></div><p id="${name}-message" class="marketing-message" role="status" hidden></p>${body}`;document.querySelector('.main-footer').before(el);return el;}
+export function notice(name,message,error=false){const el=$(name+'-message');el.hidden=!message;el.textContent=message;el.classList.toggle('error',error);}
+export function onPage(name,refresh){const activate=()=>{if(location.hash==='#'+name)refresh();};window.addEventListener('hashchange',activate);window.addEventListener('pageshow',e=>{if(e.persisted)activate();});document.addEventListener('session-restored',activate);$(name+'-refresh').addEventListener('click',refresh);activate();}

@@ -1,0 +1,418 @@
+[
+  {
+    "path": "clinic_analytics/access.py",
+    "source_sha256": "e3b10a1edb134c169c01f8efd1bffec74c5ecbb8595d0528d06e46949698a885",
+    "sha256": "e3b10a1edb134c169c01f8efd1bffec74c5ecbb8595d0528d06e46949698a885"
+  },
+  {
+    "path": "clinic_analytics/ad_reports.py",
+    "source_sha256": "bdbebd8b78b02b6848bb725cddae3a8c9740e090d043d8e550eac35c6fa7a6c1",
+    "sha256": "bdbebd8b78b02b6848bb725cddae3a8c9740e090d043d8e550eac35c6fa7a6c1"
+  },
+  {
+    "path": "clinic_analytics/ad_uploads.py",
+    "source_sha256": "790205289af00d6b49813687a7b25e16e59fdad8a22fbb6b636d3930e27509bb",
+    "sha256": "790205289af00d6b49813687a7b25e16e59fdad8a22fbb6b636d3930e27509bb"
+  },
+  {
+    "path": "clinic_analytics/agency.py",
+    "source_sha256": "54560b157313f3ec0cc943310cec4a5b2f335fc98eb2c6856495a9f19d388eed",
+    "sha256": "54560b157313f3ec0cc943310cec4a5b2f335fc98eb2c6856495a9f19d388eed"
+  },
+  {
+    "path": "clinic_analytics/analytics.py",
+    "source_sha256": "1268b13ba7619e23f9223fa57af7e8eb23c61503d938f37bbd4004866cb2f772",
+    "sha256": "1268b13ba7619e23f9223fa57af7e8eb23c61503d938f37bbd4004866cb2f772"
+  },
+  {
+    "path": "clinic_analytics/campaign_analysis.py",
+    "source_sha256": "9c479cca18602fce3e0ec676922da82cd3a7fdc3d8f4368661c198c814dc6ced",
+    "sha256": "9c479cca18602fce3e0ec676922da82cd3a7fdc3d8f4368661c198c814dc6ced"
+  },
+  {
+    "path": "clinic_analytics/campaign_locations.py",
+    "source_sha256": "b387e645dc71800662dc44fd4029b58629347c884071d5cfe0dbcfb6e20918ca",
+    "sha256": "b387e645dc71800662dc44fd4029b58629347c884071d5cfe0dbcfb6e20918ca"
+  },
+  {
+    "path": "clinic_analytics/claude_subscription.py",
+    "source_sha256": "a78b7dc86763b674492e9ba109328065a107c776d062ce21d3990b91884287e9",
+    "sha256": "a78b7dc86763b674492e9ba109328065a107c776d062ce21d3990b91884287e9"
+  },
+  {
+    "path": "clinic_analytics/clinic_location.py",
+    "source_sha256": "eacf7c5dea49951ad77d7f532fbe1629d0d1037fae14f4a161c4aa1e89bec61e",
+    "sha256": "eacf7c5dea49951ad77d7f532fbe1629d0d1037fae14f4a161c4aa1e89bec61e"
+  },
+  {
+    "path": "clinic_analytics/competitors.py",
+    "source_sha256": "2e49251ecaa40d208e35d61da8aad642435745898ebb2b5bd34f9e97a80594f0",
+    "sha256": "2e49251ecaa40d208e35d61da8aad642435745898ebb2b5bd34f9e97a80594f0"
+  },
+  {
+    "path": "clinic_analytics/conversions.py",
+    "source_sha256": "d07997eb3478c26f862036a5e045572bf195e76d90684760238ae922d2d566f9",
+    "sha256": "d07997eb3478c26f862036a5e045572bf195e76d90684760238ae922d2d566f9"
+  },
+  {
+    "path": "clinic_analytics/evidence_assistant.py",
+    "source_sha256": "0506a342cc78a160b98600e62a479991f56e726224a0fe12c9697cb0585360c7",
+    "sha256": "0506a342cc78a160b98600e62a479991f56e726224a0fe12c9697cb0585360c7"
+  },
+  {
+    "path": "clinic_analytics/imports.py",
+    "source_sha256": "253e44d4d8e2a576d180270296d619fafc2f2085a6ff04efd5e291b3382d42a9",
+    "sha256": "253e44d4d8e2a576d180270296d619fafc2f2085a6ff04efd5e291b3382d42a9"
+  },
+  {
+    "path": "clinic_analytics/internal_finance.py",
+    "source_sha256": "a6b8c3340a6810c3525836086356b954142e0cd6c7bb937c7d3e6669bc27ab8c",
+    "sha256": "a6b8c3340a6810c3525836086356b954142e0cd6c7bb937c7d3e6669bc27ab8c"
+  },
+  {
+    "path": "clinic_analytics/knowledge.py",
+    "source_sha256": "0aba52cc82e087250c5c05726d5145adebc106c86a9179029d72af4acbbfafc9",
+    "sha256": "0aba52cc82e087250c5c05726d5145adebc106c86a9179029d72af4acbbfafc9"
+  },
+  {
+    "path": "clinic_analytics/loader.py",
+    "source_sha256": "e05e8efd3a42cf811ba23e3aa7de7902489a305ee4158315f16afe63553a0b8c",
+    "sha256": "e05e8efd3a42cf811ba23e3aa7de7902489a305ee4158315f16afe63553a0b8c"
+  },
+  {
+    "path": "clinic_analytics/marketing.py",
+    "source_sha256": "b9b953c5ca1b92b100e9435a243b4197abe62ad9640571c3861ffbeceb9b1f91",
+    "sha256": "b9b953c5ca1b92b100e9435a243b4197abe62ad9640571c3861ffbeceb9b1f91"
+  },
+  {
+    "path": "clinic_analytics/marketing_api.py",
+    "source_sha256": "22e0d87c0ffa02fc21070c5534400fb6d79569d8bb31aa791436637c91fac5e6",
+    "sha256": "22e0d87c0ffa02fc21070c5534400fb6d79569d8bb31aa791436637c91fac5e6"
+  },
+  {
+    "path": "clinic_analytics/marketing_reports.py",
+    "source_sha256": "2f8a5274438c57143a44a021d6a924cdc570c079c2b0a2392fbc22bce024b403",
+    "sha256": "2f8a5274438c57143a44a021d6a924cdc570c079c2b0a2392fbc22bce024b403"
+  },
+  {
+    "path": "clinic_analytics/market_context.py",
+    "source_sha256": "76989873592c729b58284679136619ebf66b0d1708a00675b15409b1d94a277a",
+    "sha256": "76989873592c729b58284679136619ebf66b0d1708a00675b15409b1d94a277a"
+  },
+  {
+    "path": "clinic_analytics/monitoring.py",
+    "source_sha256": "0586bef5c4d90f2961feb83471d7f69bb7d9047f6c3aa553f78e3f82da2d2c99",
+    "sha256": "0586bef5c4d90f2961feb83471d7f69bb7d9047f6c3aa553f78e3f82da2d2c99"
+  },
+  {
+    "path": "clinic_analytics/operations_bundle.py",
+    "source_sha256": "07444ea1885b0d1609fb15d56c1ae0a0bfb4032a9e7869f4da2b52fadd3d1514",
+    "sha256": "07444ea1885b0d1609fb15d56c1ae0a0bfb4032a9e7869f4da2b52fadd3d1514"
+  },
+  {
+    "path": "clinic_analytics/presentation.py",
+    "source_sha256": "79f9c6da130aeed58f507169bf91b27d125bf1870e5786d4583951d76bf94352",
+    "sha256": "79f9c6da130aeed58f507169bf91b27d125bf1870e5786d4583951d76bf94352"
+  },
+  {
+    "path": "clinic_analytics/public_fetch.py",
+    "source_sha256": "42e82aa9dc21b268e40d7f300d1e2185d326d4885092ee22d4f798b1429fe996",
+    "sha256": "42e82aa9dc21b268e40d7f300d1e2185d326d4885092ee22d4f798b1429fe996"
+  },
+  {
+    "path": "clinic_analytics/recovery.py",
+    "source_sha256": "d194b0939ce68001e44fe6743093cc7ad3629bd924e9140fce135dc7f97e3773",
+    "sha256": "d194b0939ce68001e44fe6743093cc7ad3629bd924e9140fce135dc7f97e3773"
+  },
+  {
+    "path": "clinic_analytics/regional_context.py",
+    "source_sha256": "4e839b915e4daa4ee35466bbfd389669de14e295f22f7555dd8e361cf0208d4e",
+    "sha256": "4e839b915e4daa4ee35466bbfd389669de14e295f22f7555dd8e361cf0208d4e"
+  },
+  {
+    "path": "clinic_analytics/regions.py",
+    "source_sha256": "be8b1362a015374c36560329a7245ebb1e10cba44303cf56f553525a6c894de9",
+    "sha256": "be8b1362a015374c36560329a7245ebb1e10cba44303cf56f553525a6c894de9"
+  },
+  {
+    "path": "clinic_analytics/report_campaigns.py",
+    "source_sha256": "74b54affe2a695fbbcde5c7e139f17c386b473c98d220a305a49ca45ed4b32a8",
+    "sha256": "74b54affe2a695fbbcde5c7e139f17c386b473c98d220a305a49ca45ed4b32a8"
+  },
+  {
+    "path": "clinic_analytics/report_measurements.py",
+    "source_sha256": "923ce500ef73c3791bc46cf0d9d05ee42ece2093d7852b5a980eae79f80b1b48",
+    "sha256": "923ce500ef73c3791bc46cf0d9d05ee42ece2093d7852b5a980eae79f80b1b48"
+  },
+  {
+    "path": "clinic_analytics/road_addresses.py",
+    "source_sha256": "7f7242ee8bcdbe2e254c25c6884f53f38611a29d3feef2ea36198c1c69e490d4",
+    "sha256": "7f7242ee8bcdbe2e254c25c6884f53f38611a29d3feef2ea36198c1c69e490d4"
+  },
+  {
+    "path": "clinic_analytics/server.py",
+    "source_sha256": "c7e09d12b5640a0c76a1ba11d3b167741ad6cb4739fb5ff737800094e9bdedb7",
+    "sha256": "c7e09d12b5640a0c76a1ba11d3b167741ad6cb4739fb5ff737800094e9bdedb7"
+  },
+  {
+    "path": "clinic_analytics/strategy_assistant.py",
+    "source_sha256": "219b5942d4eab823fb8755d4127ccd545437db3ab7ffb51d791a0da1f70cc253",
+    "sha256": "219b5942d4eab823fb8755d4127ccd545437db3ab7ffb51d791a0da1f70cc253"
+  },
+  {
+    "path": "clinic_analytics/work_queue.py",
+    "source_sha256": "e4d01caa5dbfd644bd40278ac1ce35aefa334b5dd8dab289e4c21a70103e795d",
+    "sha256": "e4d01caa5dbfd644bd40278ac1ce35aefa334b5dd8dab289e4c21a70103e795d"
+  },
+  {
+    "path": "clinic_analytics/__init__.py",
+    "source_sha256": "7c47e5f760873232b1eac5899e2d863ec8413abe2c44532a055a868d1c623a6e",
+    "sha256": "7c47e5f760873232b1eac5899e2d863ec8413abe2c44532a055a868d1c623a6e"
+  },
+  {
+    "path": "static/ad-mapping.js",
+    "source_sha256": "ccd7be4367d47cb2a5372b8ffc80f3ac69b26bc3d6617c07ba919c4a73340811",
+    "sha256": "ccd7be4367d47cb2a5372b8ffc80f3ac69b26bc3d6617c07ba919c4a73340811"
+  },
+  {
+    "path": "static/ad-reports.css",
+    "source_sha256": "ee7dd999c7a08205f7ad474f07ccbf4fdf04471adf1de7ef01eadc8a12190ce6",
+    "sha256": "ee7dd999c7a08205f7ad474f07ccbf4fdf04471adf1de7ef01eadc8a12190ce6"
+  },
+  {
+    "path": "static/ad-reports.js",
+    "source_sha256": "be003f27429791ffd6e1db6225ad98377223308e31308b74f4c0b454f10c7cfa",
+    "sha256": "be003f27429791ffd6e1db6225ad98377223308e31308b74f4c0b454f10c7cfa"
+  },
+  {
+    "path": "static/agency.css",
+    "source_sha256": "ff389af1eccebfead3b0bf465ed13d740c8331293afbfd41bad994be4cfb6568",
+    "sha256": "ff389af1eccebfead3b0bf465ed13d740c8331293afbfd41bad994be4cfb6568"
+  },
+  {
+    "path": "static/agency.js",
+    "source_sha256": "3ad78abbfb1745547aad08b27d436f0b2b2fde5f0b88951d31c58fc81d5c83c6",
+    "sha256": "3ad78abbfb1745547aad08b27d436f0b2b2fde5f0b88951d31c58fc81d5c83c6"
+  },
+  {
+    "path": "static/app.js",
+    "source_sha256": "447158cb9b5918dfee20c65009ccbcae6e9b6448352be4b237f3339df8b88eb9",
+    "sha256": "447158cb9b5918dfee20c65009ccbcae6e9b6448352be4b237f3339df8b88eb9"
+  },
+  {
+    "path": "static/assistant.js",
+    "source_sha256": "0389f69658a1a5cca700e2f0724a50bbeb7f7c1ccbc87932b8e752142a5bf1a3",
+    "sha256": "0389f69658a1a5cca700e2f0724a50bbeb7f7c1ccbc87932b8e752142a5bf1a3"
+  },
+  {
+    "path": "static/campaign-analysis.js",
+    "source_sha256": "6d381a155267f37e868871646a7221c3d64f1fca186285e99e7b32c767ef020c",
+    "sha256": "6d381a155267f37e868871646a7221c3d64f1fca186285e99e7b32c767ef020c"
+  },
+  {
+    "path": "static/campaign-map.js",
+    "source_sha256": "95e5322fea006229b0110ecc1ee8ffb9fab431f75ad0d4d16ac134ab8fe1f903",
+    "sha256": "95e5322fea006229b0110ecc1ee8ffb9fab431f75ad0d4d16ac134ab8fe1f903"
+  },
+  {
+    "path": "static/charts.js",
+    "source_sha256": "2145686cc6a047980be593b15cfdbf5d6b40bede95b7c586f3882b91952fddb4",
+    "sha256": "2145686cc6a047980be593b15cfdbf5d6b40bede95b7c586f3882b91952fddb4"
+  },
+  {
+    "path": "static/clinic-location.css",
+    "source_sha256": "138a53e943e7b429723f07967eb6fd211c1f8b295bbb7e6e46c8c75729daaef6",
+    "sha256": "138a53e943e7b429723f07967eb6fd211c1f8b295bbb7e6e46c8c75729daaef6"
+  },
+  {
+    "path": "static/clinic-location.js",
+    "source_sha256": "4e03d3b16e5ad4e3db495e2c6e9a1f86a42b5030cf3293902f6d5de880ba7999",
+    "sha256": "4e03d3b16e5ad4e3db495e2c6e9a1f86a42b5030cf3293902f6d5de880ba7999"
+  },
+  {
+    "path": "static/conversions.css",
+    "source_sha256": "e562a59ab0e4e77d98d0590f12488d80f01cda235cef0601756b94a5c5538cb9",
+    "sha256": "e562a59ab0e4e77d98d0590f12488d80f01cda235cef0601756b94a5c5538cb9"
+  },
+  {
+    "path": "static/conversions.js",
+    "source_sha256": "11d39143d44bdc580a4e8c9f3d2141ba7ff6082753a15970cccc3d8d869f0ac3",
+    "sha256": "11d39143d44bdc580a4e8c9f3d2141ba7ff6082753a15970cccc3d8d869f0ac3"
+  },
+  {
+    "path": "static/favicon.svg",
+    "source_sha256": "190572456637a11f40e3f2e4bb37e37180d54c0f5f81a401be9de5d84c8e2829",
+    "sha256": "190572456637a11f40e3f2e4bb37e37180d54c0f5f81a401be9de5d84c8e2829"
+  },
+  {
+    "path": "static/imports.css",
+    "source_sha256": "9709b84a62e23de1addd57513175a2dfa52f44864e3e0499038864a572a87afd",
+    "sha256": "9709b84a62e23de1addd57513175a2dfa52f44864e3e0499038864a572a87afd"
+  },
+  {
+    "path": "static/imports.js",
+    "source_sha256": "95f0571395af148dcfae13905fb503f76415ac3aaf48ba6b55db88b852ba4f22",
+    "sha256": "95f0571395af148dcfae13905fb503f76415ac3aaf48ba6b55db88b852ba4f22"
+  },
+  {
+    "path": "static/index.html",
+    "source_sha256": "16b5f2f3db12ae766d672e2b6e7ba7e130af00e7c9c8256fbe7c8e8dd68bdfee",
+    "sha256": "c113ac8cfe3ff9003cd369d7dcd7df582d34d1aeed789f478ee602877b8eaa11"
+  },
+  {
+    "path": "static/internal-finance.css",
+    "source_sha256": "03d85b4d8a2a0f7114dd8148929c0276e817aa80c63ad4a4dac3906761f7c3ce",
+    "sha256": "03d85b4d8a2a0f7114dd8148929c0276e817aa80c63ad4a4dac3906761f7c3ce"
+  },
+  {
+    "path": "static/internal-finance.js",
+    "source_sha256": "895d700decc59bf6da19d410864a574a9831523b6a8ef735bef4892a81db0294",
+    "sha256": "895d700decc59bf6da19d410864a574a9831523b6a8ef735bef4892a81db0294"
+  },
+  {
+    "path": "static/knowledge.css",
+    "source_sha256": "0573a888a17c19123bf9168305627abc789b402d1fa0e217fec8f04e6a17f301",
+    "sha256": "0573a888a17c19123bf9168305627abc789b402d1fa0e217fec8f04e6a17f301"
+  },
+  {
+    "path": "static/knowledge.js",
+    "source_sha256": "1d16f6382bfa1446aea25f5e19ee0f5013393dd87a25c26ac81c81611728bbb3",
+    "sha256": "1d16f6382bfa1446aea25f5e19ee0f5013393dd87a25c26ac81c81611728bbb3"
+  },
+  {
+    "path": "static/map-layout.js",
+    "source_sha256": "3212e44891fce821ccf582ef80b33be62b61e26d17bfd5ddc13d99fb27fb7850",
+    "sha256": "3212e44891fce821ccf582ef80b33be62b61e26d17bfd5ddc13d99fb27fb7850"
+  },
+  {
+    "path": "static/map.js",
+    "source_sha256": "3dee0bb003743ef777370f6aed89a8524f095740c313d811271ff70b048ffe43",
+    "sha256": "3dee0bb003743ef777370f6aed89a8524f095740c313d811271ff70b048ffe43"
+  },
+  {
+    "path": "static/marketing.css",
+    "source_sha256": "55015bf6127b1b36b2ecbe030101a7be9718e8355876a10fb9a71953cfd6e7fa",
+    "sha256": "55015bf6127b1b36b2ecbe030101a7be9718e8355876a10fb9a71953cfd6e7fa"
+  },
+  {
+    "path": "static/marketing.js",
+    "source_sha256": "85fd9287782d09c672ae27959252ee42eb6f42f3e09f475c7d87dda6c3c016b1",
+    "sha256": "85fd9287782d09c672ae27959252ee42eb6f42f3e09f475c7d87dda6c3c016b1"
+  },
+  {
+    "path": "static/monitoring.js",
+    "source_sha256": "4c6aa7d85c088a9b4e02fbf3fe512a3e039b35f5e7aa3c9d373eea0801c6c1ac",
+    "sha256": "4c6aa7d85c088a9b4e02fbf3fe512a3e039b35f5e7aa3c9d373eea0801c6c1ac"
+  },
+  {
+    "path": "static/operations-bundle.css",
+    "source_sha256": "691b1907eb1462893477df7d8c246010a272849e3f5ff21393458730fbe0c173",
+    "sha256": "691b1907eb1462893477df7d8c246010a272849e3f5ff21393458730fbe0c173"
+  },
+  {
+    "path": "static/operations-ui.js",
+    "source_sha256": "347c862d505ffee6198e9aa366519758840e56d821d1b102f4defe334c163e97",
+    "sha256": "347c862d505ffee6198e9aa366519758840e56d821d1b102f4defe334c163e97"
+  },
+  {
+    "path": "static/presentation.css",
+    "source_sha256": "b6ed36a02f19b6ac1cd9dfeb5f80420eaa2b62343ba997da825553e733ff755e",
+    "sha256": "b6ed36a02f19b6ac1cd9dfeb5f80420eaa2b62343ba997da825553e733ff755e"
+  },
+  {
+    "path": "static/presentation.js",
+    "source_sha256": "138915aa79449e55b29197d68613edf270c36880d65159dfc93f116d25b1fda5",
+    "sha256": "138915aa79449e55b29197d68613edf270c36880d65159dfc93f116d25b1fda5"
+  },
+  {
+    "path": "static/recovery.js",
+    "source_sha256": "aa0c2715f97fa0d47eb4ce5b17191cbf93f3ad5814866aac545d615735a1d4cd",
+    "sha256": "aa0c2715f97fa0d47eb4ce5b17191cbf93f3ad5814866aac545d615735a1d4cd"
+  },
+  {
+    "path": "static/reference-charts.js",
+    "source_sha256": "68e02656ca4d14fe20bc3b55aa9f9dbae64b4d53253cc10435e1801270fb8359",
+    "sha256": "68e02656ca4d14fe20bc3b55aa9f9dbae64b4d53253cc10435e1801270fb8359"
+  },
+  {
+    "path": "static/reference.css",
+    "source_sha256": "25ee0dfb09af6179399f25192903d50f437403a21d3f9dfe9596172486cbe628",
+    "sha256": "25ee0dfb09af6179399f25192903d50f437403a21d3f9dfe9596172486cbe628"
+  },
+  {
+    "path": "static/reference.js",
+    "source_sha256": "4f72ba6b1cc8d5c632c9c4fbcb2da4d84d2c919590d8c8447cc198961023618f",
+    "sha256": "4f72ba6b1cc8d5c632c9c4fbcb2da4d84d2c919590d8c8447cc198961023618f"
+  },
+  {
+    "path": "static/regional-research.js",
+    "source_sha256": "7d027abf0e9d422f6a8103725aaa8d98f744d9b6278824e02f9cbb57fdfe08a6",
+    "sha256": "7d027abf0e9d422f6a8103725aaa8d98f744d9b6278824e02f9cbb57fdfe08a6"
+  },
+  {
+    "path": "static/report-campaigns.js",
+    "source_sha256": "c13b608ce436bd253e884c687954bab40c39386167bb2afa2f96e13368ddc6db",
+    "sha256": "c13b608ce436bd253e884c687954bab40c39386167bb2afa2f96e13368ddc6db"
+  },
+  {
+    "path": "static/report-measurements.js",
+    "source_sha256": "be5d86abbb1def15101b9cb8784a8d1669619dc244181cb8ddb82d100de23712",
+    "sha256": "be5d86abbb1def15101b9cb8784a8d1669619dc244181cb8ddb82d100de23712"
+  },
+  {
+    "path": "static/scope.js",
+    "source_sha256": "673acc47cba8d2e21e2db6ed0c94ca671d46ec3f1ca2abb5f40fbad7c6f990da",
+    "sha256": "673acc47cba8d2e21e2db6ed0c94ca671d46ec3f1ca2abb5f40fbad7c6f990da"
+  },
+  {
+    "path": "static/strategy-ai.css",
+    "source_sha256": "f0fc62d25060045068ea9c60fd7c0cfc02c778d82511fcd2bff56d4abc0f9f44",
+    "sha256": "f0fc62d25060045068ea9c60fd7c0cfc02c778d82511fcd2bff56d4abc0f9f44"
+  },
+  {
+    "path": "static/strategy-ai.js",
+    "source_sha256": "9a3c9fd823d470db0b7f79a41e8699859526922c5314a4c115837896c4249465",
+    "sha256": "9a3c9fd823d470db0b7f79a41e8699859526922c5314a4c115837896c4249465"
+  },
+  {
+    "path": "static/styles.css",
+    "source_sha256": "a0f083d273c1811fc35d107de70f579ba814467b29520a846c2112ff43aa629e",
+    "sha256": "a0f083d273c1811fc35d107de70f579ba814467b29520a846c2112ff43aa629e"
+  },
+  {
+    "path": "static/data/sig.geojson",
+    "source_sha256": "76b2c60ded464e7adeaab36e69b9032ed868845374d53d98186ac22483195b8e",
+    "sha256": "76b2c60ded464e7adeaab36e69b9032ed868845374d53d98186ac22483195b8e"
+  },
+  {
+    "path": "static/data/emd.geojson",
+    "source_sha256": "ca8d03b0df83e5d90f78b83090ef0ef03143c1be339cce9c448260005ac1e004",
+    "sha256": "ca8d03b0df83e5d90f78b83090ef0ef03143c1be339cce9c448260005ac1e004"
+  },
+  {
+    "path": "static/data/population-seoul.json",
+    "source_sha256": "e92c2edac4cd319720c568e6841e3b859d002e4319a774de49f4cc5230b7ddf4",
+    "sha256": "e92c2edac4cd319720c568e6841e3b859d002e4319a774de49f4cc5230b7ddf4"
+  },
+  {
+    "path": "static/data/competitors-seoul.json",
+    "source_sha256": "3ab3ccc3b110dbf7f36e40fe0560363b30d60c2409130ecd9c860def1dce60ba",
+    "sha256": "3ab3ccc3b110dbf7f36e40fe0560363b30d60c2409130ecd9c860def1dce60ba"
+  },
+  {
+    "path": "static/data/market-context.json",
+    "source_sha256": "b70dda8fd984e7480bdb2d0fa8e244da5393eecc8e0928ef812d635fa3ccd7f5",
+    "sha256": "b70dda8fd984e7480bdb2d0fa8e244da5393eecc8e0928ef812d635fa3ccd7f5"
+  },
+  {
+    "path": "static/data/provenance.json",
+    "source_sha256": "f7c014f5df4f0a0efdacf733571fd5b0dfbc98dbd7bd713980f8226f80474982",
+    "sha256": "f7c014f5df4f0a0efdacf733571fd5b0dfbc98dbd7bd713980f8226f80474982"
+  },
+  {
+    "path": "resources/roads-capital.sqlite.gz",
+    "source": "https://www.epost.go.kr/search/zipcode/areacdAddressDown.jsp",
+    "source_sha256": "47167ff620cbb2aebd9b4cbae0f39912bf678f5c5ad9b6410abd723984668e8c",
+    "sha256": "9781944ed5577a652d443b4952eaec3c8736683d42bdefdd22b1ceae12559c01"
+  }
+]
