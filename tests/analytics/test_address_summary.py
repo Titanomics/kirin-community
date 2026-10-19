@@ -72,6 +72,19 @@ class AddressSummaryTests(unittest.TestCase):
         self.assertNotIn('src="http',html)
         self.assertNotIn('고유환자 10',html)
         self.assertIn('중복 환자 여부',html)
+    def test_uses_original_map_layout_controls_and_offline_export(self):
+        from analytics_runtime.address_summary import render_report
+        report=self.parse();clinic={'id':FIRST,'name':'검증병원'}
+        embedded=render_report(report,clinic,embedded=True)
+        exported=render_report(report,clinic)
+        for html in (embedded,exported):
+            self.assertIn('id="map-container"',html)
+            self.assertIn('id="map-detail"',html)
+            self.assertIn('id="map-search"',html)
+            self.assertIn('id="zoom-in"',html)
+            self.assertIn('const EARTH=2*Math.PI*6378137',html)
+        self.assertIn('data-basemap="true"',embedded)
+        self.assertIn('data-basemap="false"',exported)
     def test_cloud_aggregate_persists_and_cannot_cross_clinic(self):
         report=self.parse();report['clinic_id']=FIRST
         backend=MemoryBackend()

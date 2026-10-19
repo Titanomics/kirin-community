@@ -1,4 +1,5 @@
 """Validated aggregate-only reports. No invented receipts, identities or revenue."""
+import base64
 import hashlib
 import io
 import json
@@ -106,30 +107,15 @@ def read_reports(root,clinic_id):
         result[path.stem]=report
     return result
 
-def map_svg(report):
-    features=report.get('geometry',[])
-    if not features:return '<p class="muted">확인된 지도 경계가 없습니다. 주소별 표를 확인해 주세요.</p>'
-    totals=Counter()
-    for row in report['rows']:
-        if row.get('region_code'):totals[row['region_code']]+=row['records']
-    def rings(feature):
-        geometry=feature['geometry'];coords=geometry['coordinates']
-        return coords if geometry['type']=='Polygon' else [ring for polygon in coords for ring in polygon] if geometry['type']=='MultiPolygon' else []
-    coordinates=[xy for feature in features for ring in rings(feature) for xy in ring]
-    if not coordinates:return ''
-    # Equirectangular local projection; the map represents legal-dong totals, not building pins.
-    cosine=math.cos(math.radians(sum(p[1] for p in coordinates)/len(coordinates)))
-    xs=[p[0]*cosine for p in coordinates];ys=[p[1] for p in coordinates]
-    x0,x1,y0,y1=min(xs),max(xs),min(ys),max(ys);scale=min(700/max(x1-x0,.001),430/max(y1-y0,.001))
-    paths=[]
-    for feature in features:
-        props=feature['properties'];code=props['EMD_CD'];amount=totals.get(code,0)
-        name=props['FULL_NM'];d=' '.join('M'+'L'.join(f'{40+(p[0]*cosine-x0)*scale:.2f},{30+(y1-p[1])*scale:.2f}' for p in ring)+'Z' for ring in rings(feature))
-        color=f'hsl(266 68% {88-48*amount/max(totals.values(),default=1):.1f}%)' if amount else 'transparent'
-        title=f'{name} · {amount:,}건' if amount else f'{name} · 자료 없음'
-        if code==report.get('clinic_region'):title+=' · 병원 소재 법정동'
-        paths.append(f'<path d="{d}" fill="{color}" fill-rule="evenodd" class="region" data-region="{escape(code)}" tabindex="0" role="button" aria-label="{escape(title)}"><title>{escape(title)}</title></path>')
-    return '<svg viewBox="0 0 780 500" role="group" aria-label="법정동별 환자 기록 지도">'+''.join(paths)+'</svg>'
+def summary_script():
+    # Share the original ERP/HTML map's projection and label-placement code.
+    layout=(WEB.parent/'engine/static/map-layout.js').read_text('utf8').replace('export ','')
+    return '(()=>{\n'+layout+'\n'+(WEB/'address-summary.js').read_text('utf8')+'\n})();'
+
+def map_data(report):
+    data={'features':report.get('geometry',[]),'rows':[{k:r.get(k) for k in ('name','records','region_code')} for r in report['rows']],
+          'total':report['total_records'],'period':report['period']}
+    return base64.b64encode(json.dumps(data,ensure_ascii=True,allow_nan=False).encode()).decode()
 
 def render_report(report,clinic,*,embedded=False,periods=(),checked_at=None):
     validate_report(report,clinic['id'] if report.get('clinic_id') else None)
@@ -149,10 +135,12 @@ def render_report(report,clinic,*,embedded=False,periods=(),checked_at=None):
     data={'TITLE':esc(clinic['name']),'PERIOD':esc(period),'ADDRESS':esc(report.get('clinic_address','')),
         'MEASURE':esc(report.get('measure','환자 기록')),'TOTAL':f'{total:,}','COMPLEXES':str(len(rows)),
         'TOP_SHARE':f'{100*top/total:.1f}','TOP_RECORDS':f'{top:,}','MAPPED':f'{mapped:,}',
-        'CHART':chart,'TABLE':table,'MAP':map_svg(report),'CONTROLS':controls,'PERIODS':selector,'CHECKED':checked,
+        'CHART':chart,'TABLE':table,'MAP_DATA':map_data(report),'CONTROLS':controls,'PERIODS':selector,'CHECKED':checked,
+        'BASEMAP':'true' if embedded else 'false','BASEMAP_CONTROL':'checked' if embedded else 'disabled',
+        'BASEMAP_NOTE':'' if embedded else '<span class="muted">독립 HTML은 배경지도 없이 지역 경계·지명을 표시합니다.</span>',
         'SOURCE':esc(report.get('source_name','')),'HASH':esc(report.get('source_sha256','')),
         'BOUNDARY':esc(report.get('boundary_date') or '미확인'),'REFERENCE':esc(report.get('address_reference_date') or '미확인'),
         'VALIDATION':'두 시트의 순위·건수를 대조하고 주소 집계표를 한 번만 합산했습니다.' if report.get('ranking_verified') else '주소 집계표의 각 단지 기록과 전체 합계를 대조했습니다.',
-        'PREPARED':esc(prepared),'SCRIPT':(WEB/'address-summary.js').read_text('utf8')}
+        'PREPARED':esc(prepared),'SCRIPT':summary_script()}
     # One pass: workbook text containing template-like tokens is never substituted again.
     return re.sub(r'\{\{([A-Z_]+)\}\}',lambda m:data[m[1]],template)
