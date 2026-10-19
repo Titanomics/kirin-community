@@ -18,7 +18,7 @@ from datetime import datetime,timezone
 
 from .backend import CloudError,identifier
 from .snapshots import pack,restore,SnapshotError
-from .address_summary import read_reports,render_report,SummaryError,PERIOD,WEB
+from .address_summary import read_reports,render_report,summary_script,SummaryError,PERIOD
 
 ENGINE=Path(__file__).resolve().parent/'engine'
 sys.path.insert(0,str(ENGINE))
@@ -187,9 +187,10 @@ def execute(backend,clinic_id,method,path,payload=None,expected_identity=None):
                     if month not in reports:raise CloudError('해당 기간의 집계 보고서가 없습니다.',404)
                     embedded=route=='/index.html'
                     html=render_report(reports[month],clinic,embedded=embedded,periods=sorted(reports,reverse=True),checked_at=datetime.now(timezone.utc).astimezone(loader.KST).strftime('%Y-%m-%d %H:%M:%S KST'))
-                    script=(WEB/'address-summary.js').read_text('utf8')
+                    script=summary_script()
                     digest=base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
-                    policy=f"default-src 'none'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors "+("'self'" if embedded else "'none'")
+                    images='data: https://tile.openstreetmap.org' if embedded else 'data:'
+                    policy=f"default-src 'none'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; img-src {images}; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors "+("'self'" if embedded else "'none'")
                     headers={} if embedded else {'Content-Disposition':"attachment; filename*=UTF-8''"+quote(clinic['name']+'_'+month+'_지역분석.html',safe='')}
                     return 200,html.encode('utf8'),'text/html; charset=utf-8',headers,policy
                 return static_asset(route,clinic_id)
