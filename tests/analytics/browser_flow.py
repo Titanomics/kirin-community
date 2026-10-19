@@ -42,17 +42,16 @@ with sync_playwright() as p:
     page.get_by_label('분석할 병원').select_option(FIRST)
     frame=page.frame_locator('iframe');expect(frame.locator('#active-clinic-name')).to_have_text('검증 A 병원')
     expect(frame.locator('a[data-page="internalfinance"]')).to_have_count(0)
-    frame.locator('a[href="#quality"]').click();expect(frame.locator('#import-file')).to_be_visible()
-    frame.locator('#import-file').set_input_files({'name':'2024 synthetic.xlsx','mimeType':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','buffer':workbook()})
-    expect(frame.locator('#import-preview-button')).to_be_enabled();frame.locator('#import-year').fill('2024');frame.locator('#import-kind').select_option('receipts')
-    frame.locator('#import-preview-button').click();expect(frame.locator('#import-confirm')).to_be_visible()
-    frame.locator('#import-confirm').check();frame.locator('#import-commit').click();expect(frame.locator('#import-message')).to_contain_text('반영했습니다')
-    expect(frame.locator('#import-file')).to_be_enabled()
-    frame.locator('#import-file').set_input_files({'name':'2024년내원환자내원경로분포.xlsx','mimeType':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','buffer':channel_workbook()})
-    expect(frame.locator('#import-preview-button')).to_be_enabled();frame.locator('#import-kind').select_option('channels')
-    frame.locator('#import-preview-button').click();expect(frame.locator('#import-confirm')).to_be_visible()
-    frame.locator('#import-confirm').check();frame.locator('#import-commit').click();expect(frame.locator('#import-message')).to_contain_text('반영했습니다')
-    print('PASS browser Excel upload -> inspect -> preview -> commit',flush=True)
+    expect(frame.locator('a[href="#quality"]')).to_have_count(0)
+    expect(frame.locator('#import-file')).to_have_count(0)
+    # The operator prepares data; users no longer configure columns in the UI.
+    for kind,filename,data in [('receipts','synthetic.xlsx',workbook()),('channels','channels.xlsx',channel_workbook())]:
+        endpoint=BASE+f'/api/hospital-analytics/runtime/{FIRST}/api/imports/'
+        r=context.request.post(endpoint+'preview',headers={'Origin':BASE},data={'filename':filename,'year':2024,'kind':kind,'data':base64.b64encode(data).decode()})
+        assert r.status==200,r.text();prepared=r.json()
+        r=context.request.post(endpoint+'commit',headers={'Origin':BASE},data={'id':prepared['id'],'revision':prepared['revision'],'confirmed':True})
+        assert r.status==200,r.text()
+    print('PASS no data-update UI; administrator prepares and commits through existing API',flush=True)
     page.reload();page.get_by_label('분석할 병원').select_option(FIRST)
     frame=page.frame_locator('iframe');expect(frame.locator('#active-clinic-name')).to_have_text('검증 A 병원')
     frame.locator('a[href="#map"]').click()
@@ -93,7 +92,7 @@ with sync_playwright() as p:
     expect(granted_page.get_by_role('button',name='병원 분석 관리')).to_have_count(0)
     assert granted.request.get(BASE+'/api/hospital-analytics/admin').status==403
     assert granted.request.post(BASE+'/api/hospital-analytics/admin',headers={'Origin':BASE},data={'action':'set-tab-access','userId':VIEWER,'allowed':True}).status==403
-    # This clinic has no receipts yet; dashboard correctly asks for an upload.
+    # This clinic has no receipts yet; dashboard explains that data is pending.
     # Its persisted workspace is readable immediately with the global tab grant.
     assert granted.request.get(BASE+f'/api/hospital-analytics/runtime/{SECOND}/api/workspace').status==200
     page.locator('select[name="allowed"]').select_option('false')

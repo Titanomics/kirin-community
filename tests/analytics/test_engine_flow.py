@@ -79,7 +79,9 @@ class EngineFlowTests(unittest.TestCase):
         self.import_data();before=self.backend.states[FIRST]
         self.backend.role='viewer'
         self.assertEqual(self.call('/api/imports/rollback',{'revision':1,'confirmed':True})[0],403)
-        self.backend.role='editor';self.backend.conflict=True
+        self.backend.role='editor'
+        self.assertEqual(self.call('/api/imports/rollback',{'revision':1,'confirmed':True})[0],403)
+        self.backend.role='admin';self.backend.conflict=True
         self.assertEqual(self.call('/api/imports/rollback',{'revision':1,'confirmed':True})[0],409)
         self.assertEqual(self.backend.states[FIRST],before)
     def test_cross_clinic_upload_and_account_substitution_are_rejected(self):
