@@ -13,9 +13,12 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlparse,parse_qs
+from urllib.parse import quote
+from datetime import datetime,timezone
 
 from .backend import CloudError,identifier
 from .snapshots import pack,restore,SnapshotError
+from .address_summary import read_reports,render_report,SummaryError,PERIOD,WEB
 
 ENGINE=Path(__file__).resolve().parent/'engine'
 sys.path.insert(0,str(ENGINE))
@@ -51,6 +54,11 @@ def public_road():
 
 
 class CloudStore(WorkbookStore):
+    def snapshot(self):
+        config,overrides=self._configuration()
+        if config.get('allow_empty') is True and not config['files'] and not overrides:
+            raise loader.DataError('아직 분석 자료가 반영되지 않았습니다. 엑셀 파일을 담당자에게 전달해 주세요.')
+        return super().snapshot()
     def import_baseline(self):
         snapshot=super().import_baseline()
         if not snapshot.inventory:
@@ -113,10 +121,17 @@ def static_asset(path,clinic_id):
     prefix=f'/api/hospital-analytics/runtime/{clinic_id}'
     if relative=='index.html':
         html=data.decode('utf8')
-        html=re.sub(r'<a\b[^>]*data-page="internalfinance"[^>]*>.*?</a>', '', html)
+        html=re.sub(r'<a\b[^>]*data-page="(?:internalfinance|quality)"[^>]*>.*?</a>', '', html)
+        html=re.sub(r'<section id="page-quality".*?</section>', '', html, flags=re.S)
+        html=html.replace('병원별 접근 권한 적용','병원 분석 탭 접근 권한 적용')
         data=html.replace('href="/','href="'+prefix+'/').replace('src="/','src="'+prefix+'/').encode('utf8')
     if relative=='imports.js':
-        data=data.decode('utf8').replace('이 PC에 저장','병원별 비공개 저장').replace('기존 연결 파일을 사용하고 있습니다.','접수수납목록 엑셀부터 업로드해 주세요.').encode('utf8')
+        data=b'export function initImports() {}\n'
+    if relative=='app.js':
+        script=data.decode('utf8').replace("import {initImports} from './imports.js';",'').replace('initImports(()=>loadData(true));','')
+        script=re.sub(r'quality:\[[^\]]*\],','',script)
+        script=script.replace('renderReports(d);renderQuality(d);','renderReports(d);').replace("$('source-count').textContent=d.sources.length;",'')
+        data=script.encode('utf8')
     if relative=='clinic-location.css':
         data=data.decode('utf8').replace('body:not([data-access="local"]):not([data-access="admin"])',
             'body:not([data-access="editor"]):not([data-access="admin"])').encode('utf8')
@@ -135,12 +150,17 @@ def execute(backend,clinic_id,method,path,payload=None,expected_identity=None):
     principal,clinic=backend.authorize(clinic_id,write=method=='POST')
     if expected_identity and expected_identity!=f"{principal['id']}:{principal['version']}": raise CloudError('ERP 로그인 계정이 바뀌었습니다. 화면을 다시 열어 주세요.',412)
     route=parsed.path
-    if method=='GET' and route in ASSETS: return static_asset(route,clinic_id)
+    claims=parse_qs(parsed.query,keep_blank_values=True).get('clinic',[])
+    if len(claims)>1 or (claims and claims[0]!=clinic_id):raise CloudError('병원 선택이 일치하지 않습니다.',403)
+    if method=='POST' and route.startswith('/api/imports/') and principal['role']!='admin':
+        raise CloudError('원본 자료 반영은 관리자 작업입니다. 파일을 담당자에게 전달해 주세요.',403)
+    if method=='GET' and route in ASSETS and route!='/index.html': return static_asset(route,clinic_id)
     if route=='/api/internal-finance' or route.startswith('/api/internal-finance/'):
         raise CloudError('내부 비용 기능은 준비 중입니다. 엑셀 분석과 병원 보고서는 사용할 수 있습니다.',503)
     if route in ('/api/assistant/status','/api/recovery') or route.startswith(('/api/assistant/generate','/api/recovery/','/api/strategy-ai/')) or route=='/api/monitoring/check':
         raise CloudError('PC 구독 AI·자동 모니터링·로컬 복구는 ERP에 아직 연결되지 않았습니다. 엑셀 분석과 보고서는 사용할 수 있습니다.',503)
-    if method=='GET' and route not in GET_EXACT and not re.fullmatch(r'/api/workspace/(reports/[a-f0-9]{32}/(html|presentation)|contents/[a-f0-9]{32}/html)',route): raise CloudError('지원하지 않는 분석 경로입니다.',404)
+    summary_route=route=='/api/address-reports' or bool(re.fullmatch(r'/api/address-reports/20\d{2}-(?:0[1-9]|1[0-2])/html',route))
+    if method=='GET' and route not in GET_EXACT and route!='/index.html' and not summary_route and not re.fullmatch(r'/api/workspace/(reports/[a-f0-9]{32}/(html|presentation)|contents/[a-f0-9]{32}/html)',route): raise CloudError('지원하지 않는 분석 경로입니다.',404)
     if method=='POST' and not route.startswith(POST_PREFIXES) and route not in ('/api/monitoring/save','/api/monitoring/ack'): raise CloudError('지원하지 않는 분석 작업입니다.',404)
     if method=='POST':
         if not isinstance(payload,dict): raise CloudError('요청 내용을 확인해 주세요.',400)
@@ -154,6 +174,25 @@ def execute(backend,clinic_id,method,path,payload=None,expected_identity=None):
         with tempfile.TemporaryDirectory(prefix='ha-clinic-') as folder:
             root=Path(folder)
             if archive: restore(archive,root)
+            if method=='GET' and (route=='/index.html' or summary_route):
+                reports=read_reports(root,clinic_id)
+                if route=='/api/address-reports':
+                    body={'reports':[{'period':p,'total_records':r['total_records'],'complexes':len(r['rows'])} for p,r in reports.items()],
+                          'checked_at':datetime.now(timezone.utc).isoformat()}
+                    return 200,json.dumps(body).encode(),'application/json; charset=utf-8',{},None
+                if reports or summary_route:
+                    months=parse_qs(parsed.query,keep_blank_values=True).get('month',[])
+                    if len(months)>1 or (months and not PERIOD.fullmatch(months[0])):raise CloudError('보고서 기간을 확인해 주세요.',400)
+                    month=route.split('/')[-2] if summary_route else months[0] if months else max(reports)
+                    if month not in reports:raise CloudError('해당 기간의 집계 보고서가 없습니다.',404)
+                    embedded=route=='/index.html'
+                    html=render_report(reports[month],clinic,embedded=embedded,periods=sorted(reports,reverse=True),checked_at=datetime.now(timezone.utc).astimezone(loader.KST).strftime('%Y-%m-%d %H:%M:%S KST'))
+                    script=(WEB/'address-summary.js').read_text('utf8')
+                    digest=base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
+                    policy=f"default-src 'none'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors "+("'self'" if embedded else "'none'")
+                    headers={} if embedded else {'Content-Disposition':"attachment; filename*=UTF-8''"+quote(clinic['name']+'_'+month+'_지역분석.html',safe='')}
+                    return 200,html.encode('utf8'),'text/html; charset=utf-8',headers,policy
+                return static_asset(route,clinic_id)
             ctx=context(root,clinic)
             access=CloudAccess(principal,clinic_id,public_location_write=method=='POST' and route in
                 ('/api/clinic-location/save','/api/clinic-location/clear'))
@@ -170,7 +209,7 @@ def execute(backend,clinic_id,method,path,payload=None,expected_identity=None):
                 save_pending(root,ctx)
                 backend.commit(clinic_id,state['revision'],pack(root))
             return instance.result
-    except SnapshotError as error: raise CloudError(str(error)) from None
+    except (SnapshotError,SummaryError) as error: raise CloudError(str(error)) from None
 
 
 def dispatch(backend,envelope):

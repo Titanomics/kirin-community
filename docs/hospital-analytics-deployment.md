@@ -61,6 +61,16 @@ Verify the deployed flow with synthetic clinics first: anonymous denial, admin t
 
 ## Reproduce local checks without production credentials
 
+### Managed aggregate reports
+
+The ERP no longer exposes the Data Update page or column mapping. An operator receives the workbook and prepares data; selected staff browse analysis and download HTML. The existing raw-import API now requires an active admin in the Python boundary too. This is not an admin-only immutable-storage claim: selected staff retain their existing shared snapshot write permissions.
+
+`scripts/prepare-address-report.py` accepts `--source`, an explicitly confirmed `--period YYYY-MM`, `--clinic-id`, `--clinic-name`, `--clinic-address`, and an ignored/private `--output` directory. It reads apartment address/count aggregates, reconciles the independent ranking sheet and total, and uses the bundled public road reference offline. Keep source workbooks, normalized business JSON and generated HTML out of Git. Do not turn record aggregates into invented patient identities, receipts, daily visits or revenue.
+
+Store normalized output as `address-reports/YYYY-MM.json` inside the existing clinic snapshot using an ordinary authenticated administrator session and revision compare-and-swap. Restore and preserve all prior files and periods before packing; inspect an existing month before replacing it. Verify the committed snapshot/hash and original file hashes afterwards. No new migration is needed; never replay the four already-applied hospital analytics migrations for this feature.
+
+Clinics with aggregate reports open their latest month, with a month selector and standalone HTML download. Other clinics retain their existing analysis/report screens without the Data Update menu. The report contains inline styles, script and SVG, works offline, and identifies the supplied-complex denominator and record-count unit. Unprovided regions mean no data; they are not zero-patient observations. Run `python tests/analytics/browser_summary.py` after `browser_flow.py` against the synthetic harness below; both reset only the local fixture.
+
 ```powershell
 python -m unittest discover -s tests/analytics -p 'test_*.py' -v
 node --test tests/analytics/scope.test.mjs
