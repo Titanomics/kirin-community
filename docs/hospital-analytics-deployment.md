@@ -27,13 +27,15 @@ The module is implemented on `feature/hospital-analytics-access`. It reuses the 
 - Each Python request creates a separate temporary workspace; only successful mutations publish a new persistent snapshot. Snapshot restoration verifies names, hashes, sizes and timestamps; pending Excel previews survive cold starts. Missing/corrupt storage fails closed rather than silently creating an empty clinic.
 - Python and Next send a source fingerprint. A mismatch rejects the request before dispatch and prevents mixing different deployments. `prebuild` verifies the 83-file engine inventory and generates the Next fingerprint. `.gitattributes` preserves the vendored bytes.
 
-## Before applying the migration
+## Historical initial setup — already applied
+
+This section records the original PR #1 setup. Its three migrations are already applied. The old `verify-hospital-analytics.sql` smoke test expects per-clinic roles and must not run against the current tab-access model. Use `test_tab_access_sql.py` locally and the live tab-access assertions described above.
 
 1. Confirm project `kirin-community`, owner `titanomics-projects` / `team_f20EuAsQJUx3tJj4NBm3DWB9`, and Git source `Titanomics/kirin-community`. The connected Vercel tool returned 403 for this team on 2026-10-19; another available Vercel project must not be substituted.
 2. Use the ERP's actual Supabase project with a database-owner session. Do not paste service keys into code or commit `.env` files.
 3. Run `supabase/preflight-hospital-analytics.sql`. The live 2026-10-19 inspection found that the existing profile trigger did not protect `resigned_at`, and accepted retired admins. The additive `20261019090326_guard_hospital_analytics_profile_authorization.sql` closes those paths without replacing existing ERP field checks. Apply it before enabling analytics.
 4. Confirm the official `storage.allow_only_operation(text)` and `storage.allow_any_operation(text[])` helpers exist. If absent, update the Storage deployment through its supported mechanism before applying this migration. Do not remove the operation fences to bypass the check.
-5. Apply `supabase/migrations/20261019090646_hospital_analytics.sql` once, then `20261019091009_harden_hospital_analytics_function_grants.sql`. The core migration adds only HA tables/functions/policies and the private bucket. The grant follow-up accounts for Supabase's explicit default grants to `anon`/`authenticated`; revoking only `PUBLIC` is insufficient. Verify RLS, bucket privacy, and function ACLs. Run `supabase/verify-hospital-analytics.sql` for a rollback-only production smoke test.
+5. The original setup applied `supabase/migrations/20261019090646_hospital_analytics.sql` once, then `20261019091009_harden_hospital_analytics_function_grants.sql`. The core migration added only HA tables/functions/policies and the private bucket. The grant follow-up accounted for Supabase's explicit default grants to `anon`/`authenticated`; revoking only `PUBLIC` is insufficient. RLS, bucket privacy, and function ACLs were verified; the historical rollback-only smoke test was `supabase/verify-hospital-analytics.sql`.
 
 These three migrations were applied to `aniymyjlxctiqhhhfsjh` on 2026-10-19; do not replay them. Filenames match the versions assigned by Supabase. This repository does not contain the ERP's full earlier migration history; do not run a blind `db push`/reset against production.
 
