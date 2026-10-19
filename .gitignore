@@ -35,6 +35,14 @@ yarn-error.log*
 
 # vercel
 .vercel
+/supabase/.temp/
+
+# Local synthetic test state, browser artifacts, and imported clinical data
+.local/
+__pycache__/
+*.pyc
+*.xlsx
+*.pdf
 
 # typescript
 *.tsbuildinfo

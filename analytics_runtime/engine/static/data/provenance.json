@@ -1,0 +1,23 @@
+{
+  "source": "KnellBalm/kr-admin-geojson; original V-World administrative boundaries",
+  "source_url": "https://github.com/KnellBalm/kr-admin-geojson",
+  "boundary_date": "2023-07-29",
+  "commit": "3a859f2a45be8acf8237d9eefd9565f99cc603da",
+  "retrieved_at": "2026-10-16T13:56:35.110883+00:00",
+  "license": "Attribution required; see source README",
+  "note": "Fixed 2023 boundary reference for comparison; legal-dong polygons, not administrative-dong coordinates. HJD fields are not used.",
+  "files": [
+    {
+      "file": "sig.geojson",
+      "url": "https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/3a859f2a45be8acf8237d9eefd9565f99cc603da/sig.geojson",
+      "sha256": "76b2c60ded464e7adeaab36e69b9032ed868845374d53d98186ac22483195b8e",
+      "features": 250
+    },
+    {
+      "file": "emd.geojson",
+      "url": "https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/3a859f2a45be8acf8237d9eefd9565f99cc603da/emd.geojson",
+      "sha256": "ca8d03b0df83e5d90f78b83090ef0ef03143c1be339cce9c448260005ac1e004",
+      "features": 5065
+    }
+  ]
+}

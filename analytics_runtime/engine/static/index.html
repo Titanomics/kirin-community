@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><title>병원 분석 · 병원 데이터 분석</title>
+  <link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/reference.css"><link rel="stylesheet" href="/imports.css">
+  <script src="/app.js" type="module"></script>
+  <link rel="stylesheet" href="/marketing.css">
+  <link rel="stylesheet" href="/strategy-ai.css">
+  <link rel="stylesheet" href="/agency.css">
+  <link rel="stylesheet" href="/knowledge.css">
+  <link rel="stylesheet" href="/conversions.css">
+  <link rel="stylesheet" href="/ad-reports.css">
+  <link rel="stylesheet" href="/internal-finance.css">
+  <link rel="stylesheet" href="/clinic-location.css">
+  <link rel="stylesheet" href="/operations-bundle.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#overview" aria-label="병원 분석 홈"><span>☰</span><strong>KIRIN</strong></a>
+    <div class="clinic-switch"><strong>병원 분석</strong></div>
+    <nav aria-label="주 메뉴">
+      <a href="#agency" data-page="agency"><span class="nav-icon">▦</span>담당 병원 현황</a>
+      <a href="#overview" data-page="overview" class="active"><span class="nav-icon">▦</span>대시보드</a>
+      <a href="#comparison" data-page="comparison"><span class="nav-icon">▣</span>기간 비교 분석</a>
+      <div class="nav-group"><span class="nav-icon">♧</span>지역별 분석<span>⌃</span></div>
+      <a href="#map" data-page="map" class="nav-child">지도</a>
+      <a href="#regions" data-page="regions" class="nav-child">지역별 통계</a>
+      <a href="#quality" data-page="quality"><span class="nav-icon">↻</span>데이터 업데이트<span id="source-count" class="count-tag">—</span></a>
+      <a href="#settings" data-page="settings"><span class="nav-icon">⚙</span>설정</a>
+      <div class="nav-divider"></div>
+      <div class="nav-caption">추가 분석</div>
+      <a href="#patients" data-page="patients"><span class="nav-icon">◎</span>유입경로 분석</a>
+      <a href="#operations" data-page="operations"><span class="nav-icon">▤</span>예약 · 진료 보고서</a>
+      <div class="nav-divider"></div>
+      <div class="nav-caption">마케팅 운영</div>
+      <a href="#strategies" data-page="strategies"><span class="nav-icon">◎</span>지역별 전략</a>
+      <a href="#campaigns" data-page="campaigns"><span class="nav-icon">▥</span>캠페인 · 집행비</a>
+      <a href="#clientreports" data-page="clientreports"><span class="nav-icon">▤</span>월간 고객 보고서</a>
+      <a href="#knowledge" data-page="knowledge"><span class="nav-icon">▧</span>병원 자료</a>
+      <a href="#assistant" data-page="assistant"><span class="nav-icon">◇</span>병원 근거 질의응답</a>
+      <a href="#contents" data-page="contents"><span class="nav-icon">▤</span>콘텐츠 기획 · 검수</a>
+      <a href="#reviews" data-page="reviews"><span class="nav-icon">◎</span>리뷰 대응 기록</a>
+      <a href="#monitoring" data-page="monitoring"><span class="nav-icon">◉</span>채널 확인 · 알림</a>
+      <a href="#conversions" data-page="conversions"><span class="nav-icon">⇢</span>문의 · 내원 연결</a>
+      <a href="#adreports" data-page="adreports"><span class="nav-icon">▤</span>광고 보고서 · 대조</a>
+      <a href="#internalfinance" data-page="internalfinance"><span class="nav-icon">▤</span>내부 비용 · 작업시간</a>
+      <a href="#recovery" data-page="recovery"><span class="nav-icon">↻</span>백업 · 복구</a>
+    </nav>
+    <div class="sidebar-footer"><span class="status-dot"></span> ERP 병원 분석<p>병원별 접근 권한 적용</p></div>
+  </aside>
+  <div class="shell">
+    <header class="topbar"><div class="breadcrumbs"><button id="menu-toggle" class="icon-button mobile-menu" aria-label="메뉴 열기">☰</button><span id="active-clinic-name">병원 확인 중</span><span class="slash">/</span><strong id="breadcrumb">대시보드</strong></div><div class="top-right"><span class="local-label"><span class="status-dot"></span> 비공개 데이터</span><span class="avatar">K</span></div></header>
+    <main>
+      <div class="page-heading"><div><div class="eyebrow">KIRIN INSIGHTS</div><h1 id="page-title">병원 현황</h1><p id="page-description">환자의 흐름을 읽고, 다음 진료를 준비하세요.</p></div><div class="heading-actions"><button id="export" class="button secondary" disabled><span>↓</span> 집계 내려받기</button><button id="refresh" class="button primary"><span>↻</span> 새로 확인</button></div></div>
+      <section class="filter-bar" aria-label="조회 조건">
+        <div class="range-presets" role="group" aria-label="분석 기간"><button data-range="7">1주일</button><button data-range="30">1개월</button><button data-range="90">3개월</button><button data-range="365">1년</button><button data-range="all">전체 선택</button></div>
+        <div class="period-control"><span class="field-caption">조회 기간</span><div class="date-inputs"><label class="sr-only" for="start">시작일</label><input type="date" id="start"><span>→</span><label class="sr-only" for="end">종료일</label><input type="date" id="end"></div></div>
+        <div class="presets" role="group" aria-label="연도 선택"><button data-year="2023">2023</button><button data-year="2024">2024</button><button data-year="2025">2025</button><button data-year="all">전체</button></div>
+        <div class="comparison-control"><label for="compare">비교</label><select id="compare"><option value="year">전년 같은 기간</option><option value="previous">직전 같은 길이</option><option value="custom">직접 선택</option></select></div>
+        <button class="button apply" id="apply">적용</button>
+        <label class="money-selector">금액 기준 <select id="money-basis"><option value="treatment">총진료비 · 대사 전</option><option value="collection">기록된 수납액 · 대사 전</option></select></label>
+        <div id="custom-comparison" class="custom-comparison" hidden><label>비교 시작 <input type="date" id="compare-start"></label><label>비교 종료 <input type="date" id="compare-end"></label></div>
+      </section>
+      <div class="freshness-line"><span id="freshness">파일 상태를 확인하고 있습니다.</span><span id="period-note"></span></div>
+      <div id="error" class="error-banner" role="alert" hidden></div>
+      <div id="loading" class="loading-state" role="status"><div class="spinner"></div><strong>병원 데이터를 확인하고 있어요</strong><p>원본 엑셀을 읽고 집계합니다. 첫 실행에는 잠시 시간이 걸립니다.</p></div>
+      <div id="content" hidden>
+        <section id="page-overview" class="page-view">
+          <div class="section-line"><h2>병원 현황</h2><span class="muted" id="comparison-caption"></span></div>
+          <div id="kpis" class="kpi-grid"></div>
+          <article class="panel wide-trend"><div class="panel-heading"><h2>일자별 변동 통계</h2><div class="chart-switch"><label><input type="radio" name="overview-metric" value="money" checked> 매출</label><label><input type="radio" name="overview-metric" value="patients"> 환자수</label></div><label class="grain-control">집계 <select id="trend-grain"><option value="day">일자별</option><option value="month">월별</option></select></label></div><div id="trend-legend" class="reference-legend"></div><div id="trend-chart" class="chart"></div><p id="cohort-note" class="panel-footnote"></p></article>
+          <div class="reference-two-columns"><article class="panel"><div class="panel-heading"><h2>최근 3개월 성장률</h2></div><p id="growth-period" class="panel-footnote"></p><div id="growth-summary"></div></article><article class="panel"><div class="panel-heading"><h2>연령대별 환자 분포</h2></div><div id="overview-age" class="chart"></div></article></div>
+          <div class="reference-two-columns"><article class="panel"><div class="panel-heading"><h2 id="weekday-money-title">요일별 총진료비</h2></div><div id="weekday-money" class="chart"></div></article><article class="panel"><div class="panel-heading"><h2>요일별 신규 / 재방문 환자</h2></div><div class="reference-legend"><span class="blue">신규 환자군</span><span class="pink">재방문 환자군</span></div><div id="weekday-patients" class="chart"></div></article></div>
+          <p class="finance-note" id="overview-money-note"></p>
+        </section>
+        <section id="page-map" class="page-view" hidden>
+          <div class="map-toolbar"><div class="segmented" id="map-level"><button data-level="sig">시군구</button><button data-level="emd" class="active">법정동</button></div><label class="select-label">표시 지표 <select id="map-metric"><option value="treatment_total">총진료비</option><option value="collection_recorded">기록된 수납액</option><option value="patients" selected>내원 환자수</option><option value="visits">내원 횟수</option><option value="new_patients">신규 환자수</option><option value="existing_patients">재방문 환자수</option><option value="change">환자수 증감률</option></select></label><label class="map-toggle"><input id="map-names" type="checkbox" checked>지역명</label><label class="map-toggle"><input id="map-basemap" type="checkbox" checked>배경지도</label><div class="map-toolbar-end"><label class="sr-only" for="map-area">지도 범위</label><select id="map-area"><option value="seoul">서울</option><option value="capital">수도권</option><option value="all">전국</option></select><button class="button secondary" id="map-reset">화면 맞춤</button></div></div>
+          <div class="map-layout"><article class="map-panel"><div class="map-topline"><div class="map-search"><label class="sr-only" for="map-search">지역명 검색</label><input id="map-search" list="map-search-list" placeholder="시·구·법정동 이름 검색"><datalist id="map-search-list"></datalist><button id="map-search-go" aria-label="지역 검색">⌕</button></div><span id="map-coverage"></span></div><div id="map-container" class="map-container" aria-label="지역별 환자 히트맵"></div><div class="map-zoom"><button id="zoom-in" aria-label="지도 확대">+</button><button id="zoom-out" aria-label="지도 축소">−</button></div><div class="map-legend"><span id="map-low">적음</span><div class="gradient-bar"></div><span id="map-high">많음</span><span class="map-no-data">채움 없음: 기록 없음 · 회색: 소수 집계 비공개</span></div><div id="map-tile-status" role="status"></div><div class="map-credit">법정 경계 2023.07 · V-World / KnellBalm <span id="osm-credit">| © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></span></div></article><aside class="panel map-detail" id="map-detail"></aside></div>
+          <div class="map-bottom-grid"><article class="panel"><div class="panel-heading"><div><h2>환자가 많이 오는 지역</h2><p>소수 집계 지역은 세부 값을 표시하지 않습니다.</p></div></div><div id="region-ranking"></div></article><article class="panel"><div class="panel-heading"><h2>지도를 읽는 기준</h2></div><div id="map-explanation" class="explanation"></div></article></div>
+        </section>
+        <section id="page-comparison" class="page-view" hidden><div class="section-line"><h2>기간 비교 분석</h2><span>상단에서 조회 기간과 비교 기간을 지정하세요.</span></div><div id="comparison-ranges" class="comparison-ranges"></div><div id="comparison-table" class="table-scroll panel"></div><div class="reference-two-columns"><article class="panel"><h2>금액 추이 비교</h2><div id="comparison-money" class="chart"></div></article><article class="panel"><h2>환자수 추이 비교</h2><div id="comparison-patients" class="chart"></div></article></div><p class="panel-footnote">추이는 각 기간의 첫 관측 월부터 순서대로 비교합니다. 기간이 겹치면 같은 접수가 두 기간에 포함됩니다.</p><article class="panel"><div class="panel-heading"><h2>지역별 변화</h2><a href="#regions">전체 지역 통계 →</a></div><div id="comparison-regions" class="table-scroll"></div></article></section>
+        <section id="page-regions" class="page-view" hidden><div class="section-line"><h2>지역별 통계</h2></div><div class="statistics-controls"><label>단위 <select id="stats-level"><option value="emd">법정동</option><option value="sig">시군구</option></select></label><label>지역 검색 <input id="stats-search" type="search" placeholder="지역명 입력"></label><label>정렬 <select id="stats-sort"><option value="treatment_total">총진료비 높은 순</option><option value="patients" selected>환자수 많은 순</option><option value="new_patients">신규 환자 많은 순</option><option value="change">환자수 증감률 순</option></select></label></div><p id="stats-summary" class="panel-footnote"></p><div id="stats-table" class="table-scroll panel"></div></section>
+        <section id="page-settings" class="page-view" hidden><article class="panel"><h2>집계 기준</h2><div id="settings-definitions" class="explanation"></div></article><article class="panel"><h2>연결된 기능과 추가 자료</h2><div id="feature-coverage" class="table-scroll"></div><p class="panel-footnote">공개 HTRACKER 화면을 기준으로 구성했습니다. 비공개 산식이나 확보되지 않은 자료까지 동일하게 구현되었다는 뜻은 아닙니다.</p></article></section>
+        <section id="page-patients" class="page-view" hidden>
+          <div class="two-column"><article class="panel"><div class="panel-heading"><h2>내원경로별 환자</h2></div><div id="patients-channels"></div></article><article class="panel"><div class="panel-heading"><h2>요일별 접수</h2></div><div id="weekday-chart" class="chart"></div></article><article class="panel"><div class="panel-heading"><h2>연령 분포</h2></div><div id="patients-age"></div></article><article class="panel"><div class="panel-heading"><h2>성별 분포</h2></div><div id="patients-sex"></div></article></div>
+          <article class="panel table-panel"><div class="panel-heading"><h2>유입경로 상세</h2><span class="muted">복수 경로 기록 환자는 여러 그룹에 포함될 수 있습니다.</span></div><div id="channel-table" class="table-scroll"></div></article>
+          <article class="panel"><div class="panel-heading"><h2>연령대별 유입 경로</h2><select id="channel-age-mode" aria-label="연령별 경로 표시"><option value="patients" selected>환자수</option><option value="percent">연령대 내 비율</option></select></div><p class="panel-footnote">선택기간 환자별 마지막 접수의 연령·경로를 사용합니다. 기록된 경로 분석이며 광고의 인과효과가 아닙니다.</p><div id="channel-age-table" class="table-scroll"></div></article>
+        </section>
+        <section id="page-operations" class="page-view" hidden>
+          <div class="report-banner"><span>▤</span><div><strong id="report-scope"></strong><p>아래는 연도별 제공 보고서 전체입니다. 상단의 상세 날짜 범위로 재집계한 값과 구분합니다.</p></div></div>
+          <article class="panel"><div class="panel-heading"><div><h2>월별 예약 현황</h2><p>막대: 일반 예약 · 유형별 값과 이행률은 원보고서 기준</p></div></div><div id="reservation-chart" class="chart"></div><div id="reservation-table" class="table-scroll"></div></article>
+          <div class="two-column"><article class="panel"><div class="panel-heading"><div><h2>상담 · 계획 확정</h2><p>상담자는 해당 연도 보고서 내 익명 순번입니다.</p></div></div><div id="consultation-table" class="table-scroll"></div><p class="panel-footnote">확정금액은 상담계획 금액이며 실제 수납과 다릅니다.</p></article><article class="panel"><div class="panel-heading"><div><h2>진료항목별 구성</h2><p>원보고서 진료금액 기준</p></div></div><div id="treatment-bars"></div><div id="treatment-table" class="table-scroll"></div></article></div>
+          <article class="panel table-panel"><div class="panel-heading"><h2>수가별 통계</h2><span class="muted">금액 상위 20개 · 항목 번호 표시</span></div><div id="fee-table" class="table-scroll"></div></article>
+        </section>
+        <section id="page-quality" class="page-view" hidden>
+          <div id="quality-kpis" class="kpi-grid"></div>
+          <article class="panel table-panel"><div class="panel-heading"><h2>월별 원보고서 대조</h2></div><div id="monthly-checks" class="table-scroll"></div></article>
+          <div class="two-column"><article class="panel"><div class="panel-heading"><h2>금액 대조 현황</h2><span class="warning-tag">확인 필요</span></div><div id="financial-check"></div></article><article class="panel"><div class="panel-heading"><h2>분석 기준</h2></div><div id="definitions" class="explanation"></div></article></div>
+          <article class="panel table-panel"><div class="panel-heading"><div><h2>연결된 엑셀</h2><p>열 때마다 원본 상태를 다시 확인합니다. 파일 수정시각은 EMR 추출시각과 다를 수 있습니다.</p></div></div><div id="source-table" class="table-scroll"></div></article>
+        </section>
+      </div>
+      <footer class="main-footer"><span>KIRIN CLINIC ANALYTICS</span><span>기록된 데이터에서 시작하는 병원 운영</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

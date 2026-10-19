@@ -15,9 +15,20 @@ export default function Sidebar() {
   const { user, profile } = useAuth();
   const { open, close } = useMobileMenu();
   const [hasNewPost, setHasNewPost] = useState(false);
+  const [analyticsUser, setAnalyticsUser] = useState<string | null>(null);
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    const controller = new AbortController();
+    fetch('/api/hospital-analytics/access', { cache: 'no-store', signal: controller.signal })
+      .then(async response => response.ok ? response.json() : null)
+      .then(access => { if (!controller.signal.aborted) setAnalyticsUser(access && (access.isAdmin || access.clinics?.length) ? userId : null); })
+      .catch(() => { if (!controller.signal.aborted) setAnalyticsUser(null); });
+    return () => controller.abort();
+  }, [userId, pathname]);
+  const hasAnalytics = !!user && analyticsUser === user.id;
 
   const isAdmin = profile?.role === 'admin';
-  const isLeader = profile?.role === 'leader';
 
   // 새 게시글 여부 확인
   useEffect(() => {
@@ -60,6 +71,7 @@ export default function Sidebar() {
     items.push({ name: 'OKR', href: '/kpi', icon: BarChart3 });
     items.push({ name: '출퇴근', href: '/attendance', icon: Clock });
     items.push({ name: '핵심가치', href: '/core-values', icon: Sparkles });
+    if (hasAnalytics) items.push({ name: '병원 분석', href: '/hospital-analytics', icon: BarChart3 });
 
     // 팀별 전용 메뉴
     const userTeam = profile?.team;
@@ -79,7 +91,7 @@ export default function Sidebar() {
     }
 
     return items;
-  }, [isAdmin, isLeader, profile?.team]);
+  }, [isAdmin, profile?.team, hasAnalytics]);
 
   const displayName =
     profile?.display_name ||
