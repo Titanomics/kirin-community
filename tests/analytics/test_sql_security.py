@@ -17,7 +17,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MIGRATION = ROOT / "supabase/migrations/202610190001_hospital_analytics.sql"
+MIGRATION = ROOT / "supabase/migrations/20261019090646_hospital_analytics.sql"
+PROFILE_GUARD = ROOT / "supabase/migrations/20261019090326_guard_hospital_analytics_profile_authorization.sql"
+FUNCTION_GRANTS = ROOT / "supabase/migrations/20261019091009_harden_hospital_analytics_function_grants.sql"
 ADMIN = "00000000-0000-4000-8000-000000000001"
 EDITOR = "00000000-0000-4000-8000-000000000002"
 VIEWER = "00000000-0000-4000-8000-000000000003"
@@ -272,6 +274,47 @@ class SecurityTests(unittest.TestCase):
                   "select count(*) from public.ha_clinics; select count(*) from storage.objects where bucket_id='hospital-analytics'; rollback;")
         self.assertEqual(DB.checked(source), "0\n0")
 
+    def test_retired_employee_cannot_reactivate_self(self):
+        self.denied(f"update public.profiles set resigned_at=null where id='{RESIGNED_EDITOR}';", RESIGNED_EDITOR)
+
+    def test_retired_admin_cannot_reactivate_self_or_another_admin(self):
+        for target in (RESIGNED_ADMIN, RESIGNED_EDITOR):
+            with self.subTest(target=target):
+                self.denied(f"update public.profiles set resigned_at=null where id='{target}';", RESIGNED_ADMIN)
+
+    def test_retired_admin_cannot_promote_an_employee(self):
+        self.denied(f"update public.profiles set role='admin' where id='{EDITOR}';", RESIGNED_ADMIN)
+
+    def test_active_employee_cannot_change_authorization_fields(self):
+        for change in ("role='admin'", "resigned_at=now()", f"id='{MISSING_PROFILE}'"):
+            with self.subTest(change=change):
+                self.denied(f"update public.profiles set {change} where id='{EDITOR}';")
+
+    def test_active_admin_can_manage_employee_lifecycle(self):
+        self.successful(f"update public.profiles set resigned_at=null where id='{RESIGNED_EDITOR}'; "
+                        f"select public.ha_can_access('{CLINIC_A}'); "
+                        f"update public.profiles set role='admin' where id='{EDITOR}'; "
+                        f"select role from public.profiles where id='{EDITOR}';", "t\nadmin", ADMIN)
+
+    def test_employee_can_still_edit_display_name(self):
+        self.successful(f"update public.profiles set display_name='Updated' where id='{EDITOR}'; "
+                        f"select display_name from public.profiles where id='{EDITOR}';", "Updated")
+
+    def test_database_owner_can_manage_profiles_without_user_jwt(self):
+        self.assertEqual(DB.checked(f"begin; set local request.jwt.claim.sub=''; "
+                                   f"update public.profiles set resigned_at=null where id='{RESIGNED_EDITOR}'; "
+                                   f"select resigned_at is null from public.profiles where id='{RESIGNED_EDITOR}'; rollback;"), "t")
+
+    def test_profile_trigger_not_directly_callable(self):
+        self.successful("select has_function_privilege('authenticated', 'public.ha_guard_profile_authorization()', 'execute');", "f")
+
+    def test_supabase_default_function_grants_do_not_expose_writes_or_triggers(self):
+        self.assertEqual(DB.checked("select has_function_privilege('anon', 'public.ha_commit_snapshot(uuid,bigint,text,text)', 'execute');"), "f")
+        for role in ('anon','authenticated'):
+            for function in ('ha_initialize_clinic','ha_membership_audit'):
+                with self.subTest(role=role,function=function):
+                    self.assertEqual(DB.checked(f"select has_function_privilege('{role}', 'public.{function}()', 'execute');"), "f")
+
     def test_z_concurrent_commits_only_one_wins(self):
         # The first writer holds the row lock until the second is observably blocked.
         first = subprocess.Popen(DB.psql_command(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -320,10 +363,12 @@ def fixture():
     DB.checked("""
         create role anon nologin;
         create role authenticated nologin;
+        -- Supabase grants function execution explicitly to API roles by default.
+        alter default privileges in schema public grant execute on functions to anon,authenticated;
         create schema auth;
         create schema storage;
         create table auth.users(id uuid primary key);
-        create table public.profiles(id uuid primary key references auth.users(id), role text not null, resigned_at timestamptz);
+        create table public.profiles(id uuid primary key references auth.users(id), role text not null, resigned_at timestamptz, display_name text);
         create function auth.uid() returns uuid language sql stable as
         $$ select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
         -- Model Supabase's operation-aware helpers without any external service.
@@ -334,6 +379,24 @@ def fixture():
         create function storage.allow_any_operation(operations text[]) returns boolean language sql stable as
         $$ select coalesce(bool_or(storage.allow_only_operation(op)),false) from unnest(operations) as op $$;
         grant usage on schema auth,storage to anon,authenticated;
+        -- Reproduce the relevant live ERP profile policies measured 2026-10-19.
+        -- The existing role guard does not protect resigned_at or retired admins.
+        alter table public.profiles enable row level security;
+        grant select,update on public.profiles to authenticated;
+        create policy profile_read on public.profiles for select using (auth.uid() is not null);
+        create policy profile_self_update on public.profiles for update using (auth.uid()=id);
+        create policy profile_admin_update on public.profiles for update using
+          (exists(select 1 from public.profiles p where p.id=auth.uid() and p.role='admin'));
+        create function public.protect_admin_fields() returns trigger language plpgsql security definer set search_path='' as $$
+        begin
+          if not exists(select 1 from public.profiles where id=auth.uid() and role='admin')
+             and new.role is distinct from old.role then
+            raise exception 'Only admin can update role';
+          end if;
+          return new;
+        end $$;
+        create trigger protect_profile_admin_fields before update on public.profiles
+        for each row execute function public.protect_admin_fields();
         create table storage.buckets(id text primary key,name text not null,public boolean default false,file_size_limit bigint);
         create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text not null references storage.buckets(id),name text not null,metadata jsonb,unique(bucket_id,name));
         alter table storage.objects enable row level security;
@@ -342,7 +405,9 @@ def fixture():
         insert into storage.buckets(id,name) values('legacy','legacy');
         insert into storage.objects(bucket_id,name) values('legacy','old');
     """)
+    DB.checked(PROFILE_GUARD.read_text(encoding="utf-8"))
     DB.checked(MIGRATION.read_text(encoding="utf-8"))
+    DB.checked(FUNCTION_GRANTS.read_text(encoding="utf-8"))
     users = (ADMIN, EDITOR, VIEWER, UNASSIGNED, RESIGNED_ADMIN, RESIGNED_EDITOR, MISSING_PROFILE)
     DB.checked("insert into auth.users(id) values " + ",".join(f"('{u}')" for u in users) + ";")
     DB.checked("insert into public.profiles(id,role,resigned_at) values " + ",".join(

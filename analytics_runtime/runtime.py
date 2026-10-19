@@ -59,10 +59,14 @@ class CloudStore(WorkbookStore):
 
 
 class CloudAccess:
-    def __init__(self,principal,clinic_id): self.principal=principal; self.clinic_id=clinic_id
+    def __init__(self,principal,clinic_id,public_location_write=False):
+        self.principal=principal; self.clinic_id=clinic_id; self.public_location_write=public_location_write
     def authorize(self,principal,clinic_id=None,write=False,admin=False):
         if principal!=self.principal or (clinic_id and clinic_id!=self.clinic_id): raise AccessError('병원 접근 권한이 없습니다.',403)
-        if (write and principal['role']=='viewer') or (admin and principal['role']!='admin'): raise AccessError('작업 권한이 없습니다.',403)
+        # Public map coordinates belong to the clinic's shared editable content.
+        # This exception is set only for the two allowlisted location mutations.
+        location_editor=self.public_location_write and principal['role']=='editor'
+        if (write and principal['role']=='viewer') or (admin and principal['role']!='admin' and not location_editor): raise AccessError('작업 권한이 없습니다.',403)
         return principal
 
 
@@ -104,13 +108,18 @@ def save_pending(root,ctx):
 
 def static_asset(path,clinic_id):
     relative=ASSETS[path]; file=STATIC/relative
-    if relative in ('scope.js','agency.js'): file=ADAPTER_ASSETS/relative
+    if relative in ('scope.js','agency.js','internal-finance.js'): file=ADAPTER_ASSETS/relative
     data=file.read_bytes()
     prefix=f'/api/hospital-analytics/runtime/{clinic_id}'
     if relative=='index.html':
-        data=data.decode('utf8').replace('href="/','href="'+prefix+'/').replace('src="/','src="'+prefix+'/').encode('utf8')
+        html=data.decode('utf8')
+        html=re.sub(r'<a\b[^>]*data-page="internalfinance"[^>]*>.*?</a>', '', html)
+        data=html.replace('href="/','href="'+prefix+'/').replace('src="/','src="'+prefix+'/').encode('utf8')
     if relative=='imports.js':
         data=data.decode('utf8').replace('이 PC에 저장','병원별 비공개 저장').replace('기존 연결 파일을 사용하고 있습니다.','접수수납목록 엑셀부터 업로드해 주세요.').encode('utf8')
+    if relative=='clinic-location.css':
+        data=data.decode('utf8').replace('body:not([data-access="local"]):not([data-access="admin"])',
+            'body:not([data-access="editor"]):not([data-access="admin"])').encode('utf8')
     import mimetypes
     kind=mimetypes.guess_type(relative)[0] or 'application/octet-stream'
     if file.suffix=='.js': kind='text/javascript'
@@ -127,6 +136,8 @@ def execute(backend,clinic_id,method,path,payload=None,expected_identity=None):
     if expected_identity and expected_identity!=f"{principal['id']}:{principal['version']}": raise CloudError('ERP 로그인 계정이 바뀌었습니다. 화면을 다시 열어 주세요.',412)
     route=parsed.path
     if method=='GET' and route in ASSETS: return static_asset(route,clinic_id)
+    if route=='/api/internal-finance' or route.startswith('/api/internal-finance/'):
+        raise CloudError('내부 비용 기능은 준비 중입니다. 엑셀 분석과 병원 보고서는 사용할 수 있습니다.',503)
     if route in ('/api/assistant/status','/api/recovery') or route.startswith(('/api/assistant/generate','/api/recovery/','/api/strategy-ai/')) or route=='/api/monitoring/check':
         raise CloudError('PC 구독 AI·자동 모니터링·로컬 복구는 ERP에 아직 연결되지 않았습니다. 엑셀 분석과 보고서는 사용할 수 있습니다.',503)
     if method=='GET' and route not in GET_EXACT and not re.fullmatch(r'/api/workspace/(reports/[a-f0-9]{32}/(html|presentation)|contents/[a-f0-9]{32}/html)',route): raise CloudError('지원하지 않는 분석 경로입니다.',404)
@@ -144,7 +155,8 @@ def execute(backend,clinic_id,method,path,payload=None,expected_identity=None):
             root=Path(folder)
             if archive: restore(archive,root)
             ctx=context(root,clinic)
-            access=CloudAccess(principal,clinic_id)
+            access=CloudAccess(principal,clinic_id,public_location_write=method=='POST' and route in
+                ('/api/clinic-location/save','/api/clinic-location/clear'))
             instance=CloudHandler.__new__(CloudHandler)
             instance.cloud_context=ctx; instance.cloud_principal=principal; instance.clinic_id=clinic_id
             instance.server=SimpleNamespace(agency=SimpleNamespace(access=access))

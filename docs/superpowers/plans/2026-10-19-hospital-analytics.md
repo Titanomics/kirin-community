@@ -27,7 +27,7 @@
 5. HTML/PDF report exports contain only the selected clinic, remain frozen, and assets / APIs cannot be accessed anonymously.
 
 ## Task 1 — Durable storage and authorization
-Files: `supabase/migrations/202610190001_hospital_analytics.sql`, `tests/analytics/test_sql_security.py`, `lib/hospital-analytics/access.ts`, `lib/hospital-analytics/http.ts`.
+Files: `supabase/migrations/20261019090646_hospital_analytics.sql` (filename aligned to applied Supabase version), `tests/analytics/test_sql_security.py`, `lib/hospital-analytics/access.ts`, `lib/hospital-analytics/http.ts`.
 - [x] Add active-profile admin checks, clinic membership checks, clinic/state/membership tables, and strict private-bucket policies.
 - [x] Add atomic `ha_commit_snapshot` requiring the expected revision, own clinic object prefix, and write membership.
 - [x] Verify synthetic admin/editor/viewer/unassigned/resigned principals in a real isolated local PostgreSQL cluster, including restrictive policies against a preexisting permissive storage policy.

@@ -43,5 +43,23 @@ class SnapshotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as target:
             with self.assertRaises(SnapshotError): restore(out.getvalue(),Path(target))
 
+    def test_admin_only_finance_is_never_packaged_in_shared_snapshot(self):
+        for name in ('internal-finance.sqlite','internal-finance.sqlite-wal','internal-finance.sqlite-shm'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                root=Path(folder); (root/name).write_bytes(b'ADMIN ONLY')
+                with self.assertRaises(SnapshotError): pack(root)
+
+    def test_injected_admin_finance_snapshot_is_rejected_before_extracting(self):
+        import hashlib
+        for name in ('internal-finance.sqlite','nested/internal-finance.sqlite-journal'):
+            data=b'ADMIN ONLY'; out=io.BytesIO()
+            meta={'version':1,'files':{name:{'sha256':hashlib.sha256(data).hexdigest(),
+                  'mtime_ns':1700000000000000000,'size':len(data)}}}
+            with zipfile.ZipFile(out,'w') as archive:
+                archive.writestr(name,data); archive.writestr('__snapshot__.json',json.dumps(meta))
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                with self.assertRaises(SnapshotError): restore(out.getvalue(),Path(folder))
+                self.assertEqual(list(Path(folder).iterdir()),[])
+
 
 if __name__=='__main__': unittest.main()

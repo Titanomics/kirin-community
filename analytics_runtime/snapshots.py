@@ -21,6 +21,8 @@ def safe_name(name):
     parts=PurePosixPath(name)
     if not name or '\\' in name or ':' in name or parts.is_absolute() or any(x in ('','.','..') for x in name.split('/')):
         raise SnapshotError('저장 자료의 경로가 올바르지 않습니다.')
+    if parts.name.casefold().startswith('internal-finance.sqlite'):
+        raise SnapshotError('관리자 전용 비용 자료는 병원 공용 저장본에 포함할 수 없습니다.')
     return parts
 
 

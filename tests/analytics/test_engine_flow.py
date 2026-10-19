@@ -98,5 +98,32 @@ class EngineFlowTests(unittest.TestCase):
         self.assertIn('/api/hospital-analytics/runtime/'+FIRST+'/app.js',html)
         self.assertNotIn('디데이치과',html)
 
+    def test_internal_finance_is_unavailable_before_reading_shared_snapshot(self):
+        for role in ('admin','editor','viewer'):
+            self.backend.role=role
+            for path,payload in (('/api/internal-finance',None),('/api/internal-finance/export',None),
+                                 ('/api/internal-finance/save',{}),('/api/internal-finance/void',{})):
+                with self.subTest(role=role,path=path):
+                    expected=403 if role=='viewer' and payload is not None else 503
+                    self.assertEqual(self.call(path,payload)[0],expected)
+            self.assertEqual(self.backend.states[FIRST],({'revision':0},None))
+        status,html=self.call('/index.html')
+        self.assertEqual(status,200)
+        self.assertNotIn('data-page="internalfinance"',html)
+
+    def test_public_clinic_location_is_editor_owned_and_viewer_read_only(self):
+        self.backend.role='editor'
+        location={'name':'Synthetic Clinic','address':'Synthetic public address','latitude':37.5,
+                  'longitude':127.0,'source_url':'https://example.com/clinic',
+                  'checked_on':'2024-01-01','source_note':'Synthetic reference'}
+        status,result=self.call('/api/clinic-location/save',{'data':location,'revision':0})
+        self.assertEqual(status,200,result)
+        self.backend.role='viewer'
+        status,result=self.call('/api/clinic-location')
+        self.assertEqual(status,200,result); self.assertEqual(result['location']['name'],'Synthetic Clinic')
+        self.assertEqual(self.call('/api/clinic-location/clear',{'revision':1,'confirmed':True,'reason':'test'})[0],403)
+        self.backend.role='editor'
+        self.assertEqual(self.call('/api/clinic-location/clear',{'revision':1,'confirmed':True,'reason':'test'})[0],200)
+
 
 if __name__=='__main__':unittest.main()

@@ -22,9 +22,11 @@ The module is implemented on `feature/hospital-analytics-access`. It reuses the 
 
 1. Confirm project `kirin-community`, owner `titanomics-projects` / `team_f20EuAsQJUx3tJj4NBm3DWB9`, and Git source `Titanomics/kirin-community`. The connected Vercel tool returned 403 for this team on 2026-10-19; another available Vercel project must not be substituted.
 2. Use the ERP's actual Supabase project with a database-owner session. Do not paste service keys into code or commit `.env` files.
-3. Run `supabase/preflight-hospital-analytics.sql`. Confirm existing `profiles` cannot let ordinary employees change their own `role` or clear `resigned_at`. Those existing policy definitions are not included in this Git repository and must be verified on the actual project.
+3. Run `supabase/preflight-hospital-analytics.sql`. The live 2026-10-19 inspection found that the existing profile trigger did not protect `resigned_at`, and accepted retired admins. The additive `20261019090326_guard_hospital_analytics_profile_authorization.sql` closes those paths without replacing existing ERP field checks. Apply it before enabling analytics.
 4. Confirm the official `storage.allow_only_operation(text)` and `storage.allow_any_operation(text[])` helpers exist. If absent, update the Storage deployment through its supported mechanism before applying this migration. Do not remove the operation fences to bypass the check.
-5. Apply `supabase/migrations/202610190001_hospital_analytics.sql` once. It is transactional and does not modify existing ERP tables/data. Verify the bucket is private and the new RLS policies are present.
+5. Apply `supabase/migrations/20261019090646_hospital_analytics.sql` once, then `20261019091009_harden_hospital_analytics_function_grants.sql`. The core migration adds only HA tables/functions/policies and the private bucket. The grant follow-up accounts for Supabase's explicit default grants to `anon`/`authenticated`; revoking only `PUBLIC` is insufficient. Verify RLS, bucket privacy, and function ACLs. Run `supabase/verify-hospital-analytics.sql` for a rollback-only production smoke test.
+
+These three migrations were applied to `aniymyjlxctiqhhhfsjh` on 2026-10-19; do not replay them. Filenames match the versions assigned by Supabase. This repository does not contain the ERP's full earlier migration history; do not run a blind `db push`/reset against production.
 
 ## Vercel configuration
 
@@ -38,6 +40,8 @@ Verify the deployed flow with synthetic clinics first: anonymous denial, admin a
 
 ## Current operating bounds
 
+- Internal finance (agency income/cost/time records) is disabled in this cloud release. The common clinic archive is readable by assigned viewers and replaceable by editors, so it cannot provide a separate admin-only boundary. Finance routes are rejected before reading the snapshot; finance SQLite files, markers and sidecars are rejected during packing and restoration. No live finance data existed when this bound was applied. Re-enable only after adding a separate protected store.
+- Public clinic coordinates are shared clinic content. Assigned editors and active admins can save/clear them; viewers can read only. The cloud API and UI use the same rule. Clinic registration and employee assignments remain active-admin-only.
 - XLSX upload: 25 MiB; archived clinic snapshot: 50 MiB compressed / 250 MiB expanded; at most 3,000 files. The function uses a fresh temporary directory per request and never persists solely in `/tmp`.
 - Snapshot writes currently retain immutable previous objects. This supports investigation and protects against lost updates, but storage usage grows. Measure storage/latency with representative clinic histories and agree retention before broad agency rollout. No unreviewed automatic deletion is included.
 - Existing raw files, patient identifiers and addresses are not sent to a model. Subscription-CLI AI generation, PC-local backup restoration, and unattended local monitoring are not connected to the Vercel runtime; those routes report unavailable. Excel analysis, manual marketing records, regional data and report generation work independently.
@@ -55,5 +59,18 @@ npx eslint 'app/(main)/hospital-analytics' app/api/hospital-analytics lib/hospit
 ```
 
 For the browser harness, run `python tests/analytics/browser_fixture.py` (ports 54840/54842). In a separate shell set the **synthetic** values `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54842`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=synthetic-public-key`, `HA_RUNTIME_URL=http://127.0.0.1:54840/api/analytics_runtime`; run `npm run dev -- --hostname 127.0.0.1 --port 54843`, then `python tests/analytics/browser_flow.py`. The production gateway refuses this loopback override. Stop these exact test processes afterwards; Windows shells can leave Python child processes alive.
+
+`npm run build` also needs the two public Supabase settings. Synthetic values are sufficient for a credential-free build check; that check does not validate Vercel's environment settings. Do not run `next dev` and `next build` concurrently in the same checkout because both write `.next`.
+
+## Operational verification — 2026-10-19
+
+- 18:03:26 KST: applied the profile authorization guard. At 18:05:24, an actual authenticated-role attempt to change the caller's own `resigned_at` was rejected in a rolled-back transaction.
+- 18:06:46 KST: applied HA schema. At 18:07:25, all four tables had RLS, all 15 HA policies existed, and `hospital-analytics` was private with a 50 MiB limit.
+- 18:10:09 KST: applied explicit function-grant hardening. At 18:11:08, anonymous commit and all API-role trigger execution privileges were false; authenticated commit remained true.
+- 18:10:47 KST: live rollback-only test passed admin clinic/member setup, snapshot initialization, editor clinic isolation, viewer write denial, immediate revocation and anonymous denial. After rollback, clinics/memberships/snapshots/audit remained empty; no patient files were uploaded.
+- Local verification: 39 actual PostgreSQL privilege/concurrency tests, 14 Python tests and 1 Node test passed. Next production build passed with synthetic public settings. The initial build without public settings failed on `/admin`; supplying the required settings resolved it. The existing middleware deprecation warning remains.
+- Browser verification: 8 groups passed through actual Next → Python with a synthetic loopback Supabase service: two Excel formats, cold-request persistence/map, HTML/PDF, admin assignment/revocation, viewer isolation, editor location form/persistence, pending-upload revocation, and anonymous denial. The location form test initially typed before its asynchronous load completed; waiting for `inert=false` made the test exercise the same readiness boundary as a real user. These checks do not replace Vercel-hosted verification.
+- Independent Codex review verified finance exclusion, public-location permission boundaries, source fingerprint equality and live guard metadata. No remaining P1/P2 in those changes. The intentional RLS helper SECURITY DEFINER functions and authenticated snapshot RPC still trigger advisor warnings; their UID/access checks are covered by SQL tests. Pre-existing ERP advisor warnings are outside this release.
+- Vercel management and protected-preview access still return 403 for `titanomics-projects`. Existing preview success is only a build status. Production publication remains gated on access to the exact updated deployment, Python engine response/fingerprint, and a deployed synthetic end-to-end flow.
 
 Sources: [Vercel Next + Python](https://vercel.com/kb/guide/how-to-use-python-and-javascript-in-the-same-application), [Supabase Storage operation helpers](https://supabase.com/docs/guides/storage/schema/helper-functions), [private buckets](https://supabase.com/docs/guides/storage/buckets/fundamentals).

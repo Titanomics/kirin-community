@@ -30,6 +30,7 @@ with sync_playwright() as p:
     page.goto(BASE+'/hospital-analytics');expect(page.get_by_role('heading',name='병원 분석',exact=True)).to_be_visible()
     page.get_by_label('분석할 병원').select_option(FIRST)
     frame=page.frame_locator('iframe');expect(frame.locator('#active-clinic-name')).to_have_text('검증 A 병원')
+    expect(frame.locator('a[data-page="internalfinance"]')).to_have_count(0)
     frame.locator('a[href="#quality"]').click();expect(frame.locator('#import-file')).to_be_visible()
     frame.locator('#import-file').set_input_files({'name':'2024 synthetic.xlsx','mimeType':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','buffer':workbook()})
     expect(frame.locator('#import-preview-button')).to_be_enabled();frame.locator('#import-year').fill('2024');frame.locator('#import-kind').select_option('receipts')
@@ -91,6 +92,22 @@ with sync_playwright() as p:
     assert context.request.post(BASE+'/api/hospital-analytics/upload-ticket',headers={'Origin':BASE},data={'clinicId':FIRST,'size':100}).status==403
     context.close();print('PASS viewer read-only and clinic isolation',flush=True)
     context=authenticated(browser,EDITOR)
+    editor_page=context.new_page();editor_page.goto(BASE+'/hospital-analytics')
+    editor_page.get_by_label('분석할 병원').select_option(FIRST)
+    editor_frame=editor_page.frame_locator('iframe')
+    editor_frame.locator('a[href="#settings"]').click()
+    location_form=editor_frame.locator('#clinic-location-form')
+    expect(location_form).to_be_visible()
+    expect(location_form).to_have_js_property('inert',False)
+    for key,value in {'name':'검증 A 공개 위치','address':'합성 공개 주소','latitude':'37.5','longitude':'127',
+                      'source_url':'https://example.com/clinic','checked_on':'2024-01-01','source_note':'합성 검증 근거'}.items():
+        location_form.locator('[name="'+key+'"]').fill(value)
+    location_form.get_by_role('button',name='병원 위치 저장',exact=True).click()
+    expect(editor_frame.locator('#clinic-location-message')).to_contain_text('저장했습니다')
+    editor_page.reload();editor_page.get_by_label('분석할 병원').select_option(FIRST)
+    location=context.request.get(BASE+f'/api/hospital-analytics/runtime/{FIRST}/api/clinic-location').json()
+    assert location['location']['name']=='검증 A 공개 위치'
+    print('PASS editor public map location UI -> save -> cold persistence; finance menu unavailable',flush=True)
     ticket_response=context.request.post(BASE+'/api/hospital-analytics/upload-ticket',headers={'Origin':BASE},data={'clinicId':FIRST,'size':100});assert ticket_response.ok
     ticket=ticket_response.json()
     with urlopen(FIXTURE+'/__fixture/revoke') as response:response.read()

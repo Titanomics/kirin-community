@@ -9,3 +9,10 @@ select tablename,policyname,permissive,roles,cmd,qual,with_check from pg_policie
 where (schemaname='public' and tablename='profiles') or (schemaname='storage' and tablename='objects');
 select table_name,grantee,privilege_type from information_schema.role_table_grants
 where table_schema='public' and table_name='profiles' and grantee in ('anon','authenticated');
+select t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) as trigger_definition,
+       pg_get_functiondef(t.tgfoid) as trigger_function
+from pg_trigger t where t.tgrelid='public.profiles'::regclass and not t.tgisinternal;
+select p.proname,has_function_privilege('anon',p.oid,'execute') as anon_execute,
+       has_function_privilege('authenticated',p.oid,'execute') as authenticated_execute
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and p.proname like 'ha\_%' escape '\';
