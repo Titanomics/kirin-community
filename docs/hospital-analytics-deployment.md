@@ -1,11 +1,20 @@
 # ERP hospital analytics deployment
 
+## Tab-access correction — 2026-10-19 23:03 KST
+
+- The permission target is the whole Hospital Analysis tab. Among ordinary employees the allowlist contains 전형진 only; active admins retain management access. There is no separate clinic assignment or viewer role in the current model.
+- New migration `20261019140344_hospital_analytics_tab_access.sql` was applied once to `aniymyjlxctiqhhhfsjh`; the earlier three migrations were not rerun. A normal logged-in ERP admin granted the tab through the RLS-protected REST API; no service-role key or impersonated session was used.
+- Local checks passed: 17 real PostgreSQL tab/security checks, 14 Python tests, 1 Node test, 10 browser flow groups, TypeScript, targeted lint, and the Next production build. Independent Codex review found no P1/P2 blocker and independently checked the Next/Python fingerprint and diff whitespace.
+- Advisor warnings added only the intentional SECURITY DEFINER tab-access helper for anonymous/authenticated roles. It returns false without an active authorized identity; anonymous table access and trigger execution stay revoked. Existing ERP warnings remain outside this change.
+- Real 전형진 login/use remains unverified because the user cannot log in with that account now. Database-role simulations and synthetic local users are separate evidence, not real login tests.
+- Rolling back only the application deployment does not restore the former clinic permission model: the database now authorizes by tab. Preserve the new allowlist and diagnose forward; do not replay or reverse migrations blindly.
+
 The module is implemented on `feature/hospital-analytics-access`. It reuses the existing Excel aggregation and interactive report engine. Actual patient workspaces and clinical Excel files are excluded from this repository. Existing local data has not been uploaded to production by this change.
 
 ## User flow
 
 1. Sign in with the existing ERP account and open **병원 분석**.
-2. An active `profiles.role = admin` account can register clinics and assign existing employees as editor or viewer. Admins see all clinics. Other employees see only explicitly assigned clinics; belonging to 콘텐츠팀 or being an existing `hospitals.assignee_id` does not grant clinical analytics access.
+2. An active `profiles.role = admin` account opens **병원 분석 관리** to register clinics and choose who can access the **병원 분석 tab**. The employee permission form has no clinic selector. Selected active employees can view/edit every current and future analytics clinic; admins always retain access. Other staff cannot see the sidebar tab or directly access its page, API, or files. Legacy clinic memberships, team membership and `hospitals.assignee_id` do not grant access. The current requested allowlist is 전형진 only among ordinary employees.
 3. Select a clinic. Upload the annual **접수수납목록** first, then **내원환자내원경로분포** including its patient-detail sheets for address matching. The remaining supported annual summaries are monthly visits, reservations, age distribution, consultations, fees, and treatments. Unmatched addresses are reported as unmatched, never invented.
 4. Preview and confirm each replacement. Regions use unique-patient counts: zero is transparent, higher counts use darker purple. Clicking exposes the selected region's aggregate amounts.
 5. In **월간 고객 보고서**, generate a draft for the desired month, save interpretation, and download the interactive HTML or open its presentation and print to PDF. Reports keep their captured period/data. Latest EMR is not required to view historic periods; source cutoff dates remain visible.
@@ -13,18 +22,20 @@ The module is implemented on `feature/hospital-analytics-access`. It reuses the 
 ## Architecture and deployment gates
 
 - Next.js pages and routes use the existing Supabase SSR login; profiles and grants are checked on every request. The Python function independently verifies the user JWT and clinic access. No service-role key is used by the app.
-- `ha_clinics`, `ha_memberships`, `ha_snapshots`, and `ha_audit` use RLS. `ha_commit_snapshot` is a transactional compare-and-swap: a stale writer gets a conflict.
+- `ha_tab_memberships` is the administrator-managed tab allowlist; `ha_tab_access_audit` records grants/revocations. Both use RLS, as do the existing clinic/snapshot/audit tables. Historical `ha_memberships` rows remain as evidence and no longer authorize access. `ha_commit_snapshot` is a transactional compare-and-swap: a stale writer gets a conflict.
 - The private `hospital-analytics` bucket stores immutable uploads and snapshots under clinic UUIDs. Restrictive policies also fence off preexisting broad Storage policies. Storage operations are allowlisted so employees cannot mint signed read/upload URLs that survive revocation. Direct JWT uploads are rechecked by RLS at the actual upload.
 - Each Python request creates a separate temporary workspace; only successful mutations publish a new persistent snapshot. Snapshot restoration verifies names, hashes, sizes and timestamps; pending Excel previews survive cold starts. Missing/corrupt storage fails closed rather than silently creating an empty clinic.
 - Python and Next send a source fingerprint. A mismatch rejects the request before dispatch and prevents mixing different deployments. `prebuild` verifies the 83-file engine inventory and generates the Next fingerprint. `.gitattributes` preserves the vendored bytes.
 
-## Before applying the migration
+## Historical initial setup — already applied
+
+This section records the original PR #1 setup. Its three migrations are already applied. The old `verify-hospital-analytics.sql` smoke test expects per-clinic roles and must not run against the current tab-access model. Use `test_tab_access_sql.py` locally and the live tab-access assertions described above.
 
 1. Confirm project `kirin-community`, owner `titanomics-projects` / `team_f20EuAsQJUx3tJj4NBm3DWB9`, and Git source `Titanomics/kirin-community`. The connected Vercel tool returned 403 for this team on 2026-10-19; another available Vercel project must not be substituted.
 2. Use the ERP's actual Supabase project with a database-owner session. Do not paste service keys into code or commit `.env` files.
 3. Run `supabase/preflight-hospital-analytics.sql`. The live 2026-10-19 inspection found that the existing profile trigger did not protect `resigned_at`, and accepted retired admins. The additive `20261019090326_guard_hospital_analytics_profile_authorization.sql` closes those paths without replacing existing ERP field checks. Apply it before enabling analytics.
 4. Confirm the official `storage.allow_only_operation(text)` and `storage.allow_any_operation(text[])` helpers exist. If absent, update the Storage deployment through its supported mechanism before applying this migration. Do not remove the operation fences to bypass the check.
-5. Apply `supabase/migrations/20261019090646_hospital_analytics.sql` once, then `20261019091009_harden_hospital_analytics_function_grants.sql`. The core migration adds only HA tables/functions/policies and the private bucket. The grant follow-up accounts for Supabase's explicit default grants to `anon`/`authenticated`; revoking only `PUBLIC` is insufficient. Verify RLS, bucket privacy, and function ACLs. Run `supabase/verify-hospital-analytics.sql` for a rollback-only production smoke test.
+5. The original setup applied `supabase/migrations/20261019090646_hospital_analytics.sql` once, then `20261019091009_harden_hospital_analytics_function_grants.sql`. The core migration added only HA tables/functions/policies and the private bucket. The grant follow-up accounted for Supabase's explicit default grants to `anon`/`authenticated`; revoking only `PUBLIC` is insufficient. RLS, bucket privacy, and function ACLs were verified; the historical rollback-only smoke test was `supabase/verify-hospital-analytics.sql`.
 
 These three migrations were applied to `aniymyjlxctiqhhhfsjh` on 2026-10-19; do not replay them. Filenames match the versions assigned by Supabase. This repository does not contain the ERP's full earlier migration history; do not run a blind `db push`/reset against production.
 
@@ -36,12 +47,12 @@ Keep the ERP's existing `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANO
 
 For an existing configured `VERCEL_AUTOMATION_BYPASS_SECRET`, the gateway uses the exact `VERCEL_URL` deployment and forwards that bypass header. Without it, a promoted production deployment uses `VERCEL_PROJECT_PRODUCTION_URL` (fallback: the requested `kirin-community.vercel.app` domain) because generated production URLs can be protected. Preview calls forward the user's Vercel protection cookie. A staged `--prod --skip-domain` deployment without bypass must not be treated as validated: it would reach the old production alias, and the version guard intentionally rejects it.
 
-Verify the deployed flow with synthetic clinics first: anonymous denial, admin assignment, editor Excel preview/commit, viewer denial of writes, different-clinic denial, access revocation, cold-start persistence, and HTML/PDF output. Then create real clinic spaces and upload their files through the authenticated UI. Do not put files under Next `public/` or a public Storage bucket.
+Verify the deployed flow with synthetic clinics first: anonymous denial, admin tab grant/revocation, selected employee access across clinics, unselected employee denial despite historical clinic grants, zero-clinic tab visibility, Excel preview/commit, cold-start persistence, and HTML/PDF output. Then create real clinic spaces and upload their files through the authenticated UI. Do not put files under Next `public/` or a public Storage bucket.
 
 ## Current operating bounds
 
-- Internal finance (agency income/cost/time records) is disabled in this cloud release. The common clinic archive is readable by assigned viewers and replaceable by editors, so it cannot provide a separate admin-only boundary. Finance routes are rejected before reading the snapshot; finance SQLite files, markers and sidecars are rejected during packing and restoration. No live finance data existed when this bound was applied. Re-enable only after adding a separate protected store.
-- Public clinic coordinates are shared clinic content. Assigned editors and active admins can save/clear them; viewers can read only. The cloud API and UI use the same rule. Clinic registration and employee assignments remain active-admin-only.
+- Internal finance (agency income/cost/time records) is disabled in this cloud release. The common clinic archive is readable and replaceable by staff with tab access, so it cannot provide a separate admin-only boundary. Finance routes are rejected before reading the snapshot; finance SQLite files, markers and sidecars are rejected during packing and restoration. No live finance data existed when this bound was applied. Re-enable only after adding a separate protected store.
+- Public clinic coordinates are shared clinic content. Staff with tab access and active admins can save/clear them. The cloud API and UI use the same rule. Clinic registration and tab access management remain active-admin-only.
 - XLSX upload: 25 MiB; archived clinic snapshot: 50 MiB compressed / 250 MiB expanded; at most 3,000 files. The function uses a fresh temporary directory per request and never persists solely in `/tmp`.
 - Snapshot writes currently retain immutable previous objects. This supports investigation and protects against lost updates, but storage usage grows. Measure storage/latency with representative clinic histories and agree retention before broad agency rollout. No unreviewed automatic deletion is included.
 - Existing raw files, patient identifiers and addresses are not sent to a model. Subscription-CLI AI generation, PC-local backup restoration, and unattended local monitoring are not connected to the Vercel runtime; those routes report unavailable. Excel analysis, manual marketing records, regional data and report generation work independently.
@@ -53,7 +64,7 @@ Verify the deployed flow with synthetic clinics first: anonymous denial, admin a
 ```powershell
 python -m unittest discover -s tests/analytics -p 'test_*.py' -v
 node --test tests/analytics/scope.test.mjs
-python tests/analytics/test_sql_security.py --postgres-bin 'C:/Users/gkfk0/Desktop/claudecode/CODEX/doctor domain/.superpowers/tools/postgres/runtime/pgsql/bin'
+python tests/analytics/test_tab_access_sql.py --postgres-bin 'C:/Users/gkfk0/Desktop/claudecode/CODEX/doctor domain/.superpowers/tools/postgres/runtime/pgsql/bin'
 npx tsc --noEmit
 npx eslint 'app/(main)/hospital-analytics' app/api/hospital-analytics lib/hospital-analytics
 ```
@@ -63,6 +74,8 @@ For the browser harness, run `python tests/analytics/browser_fixture.py` (ports 
 `npm run build` also needs the two public Supabase settings. Synthetic values are sufficient for a credential-free build check; that check does not validate Vercel's environment settings. Do not run `next dev` and `next build` concurrently in the same checkout because both write `.next`.
 
 ## Operational verification — 2026-10-19
+
+The sections below record historical verification of PR #1's clinic-level model. The current tab-level model above supersedes those permission expectations. Do not run the historical `verify-hospital-analytics.sql` clinic-role assertions against the new model or replay the three completed migrations. The new additive `hospital_analytics_tab_access` migration alone replaces the permission helper and adds the tab allowlist/audit.
 
 - 18:03:26 KST: applied the profile authorization guard. At 18:05:24, an actual authenticated-role attempt to change the caller's own `resigned_at` was rejected in a rolled-back transaction.
 - 18:06:46 KST: applied HA schema. At 18:07:25, all four tables had RLS, all 15 HA policies existed, and `hospital-analytics` was private with a 50 MiB limit.

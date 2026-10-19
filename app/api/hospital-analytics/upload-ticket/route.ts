@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const data = await body(request, 2048); const access = await readAccess();
     if (!validId(data.clinicId) || typeof data.size !== 'number' || !Number.isSafeInteger(data.size) || data.size <= 0 || data.size > 25 * 1024 * 1024) throw new AnalyticsError('25MB 이하의 파일을 선택해 주세요.', 400);
-    requireClinic(access, data.clinicId, true);
+    requireClinic(access, data.clinicId);
     const path = `${data.clinicId}/uploads/${crypto.randomUUID()}.xlsx`;
     const session = await access.client.auth.getSession();
     if (session.error || !session.data.session?.access_token) throw new AnalyticsError('ERP 로그인이 필요합니다.', 401);

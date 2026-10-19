@@ -28,7 +28,7 @@ with sync_playwright() as p:
     context=authenticated(browser,ADMIN);page=context.new_page();page.set_default_timeout(90000)
     errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
     page.goto(BASE+'/hospital-analytics');expect(page.get_by_role('heading',name='병원 분석',exact=True)).to_be_visible()
-    page.get_by_role('button',name='병원 · 담당자 관리').click()
+    page.get_by_role('button',name='병원 분석 관리').click()
     page.locator('input[name="name"]').fill('검증 신규 병원')
     page.locator('input[name="owner"]').fill('합성 검증')
     with page.expect_response(lambda r:r.url.endswith('/hospital-analytics/admin') and r.request.method=='POST') as created:
@@ -37,7 +37,7 @@ with sync_playwright() as p:
     created_id=created.value.json()['id']
     expect(page.get_by_label('분석할 병원')).to_have_value(created_id)
     expect(page.frame_locator('iframe').locator('#active-clinic-name')).to_have_text('검증 신규 병원')
-    page.get_by_role('button',name='병원 · 담당자 관리').click()
+    page.get_by_role('button',name='병원 분석 관리').click()
     print('PASS admin creates a clinic and immediately opens the returned workspace',flush=True)
     page.get_by_label('분석할 병원').select_option(FIRST)
     frame=page.frame_locator('iframe');expect(frame.locator('#active-clinic-name')).to_have_text('검증 A 병원')
@@ -77,31 +77,44 @@ with sync_playwright() as p:
     print('PASS report generation -> own-clinic HTML -> PDF',flush=True)
     assert not errors,errors
     assert context.request.post(BASE+'/api/hospital-analytics/upload-ticket',headers={'Origin':'https://unrelated.example'},data={'clinicId':FIRST,'size':100}).status==403
-    page.get_by_role('button',name='병원 · 담당자 관리').click()
-    page.locator('select[name="clinicId"]').select_option(FIRST)
+    page.get_by_role('button',name='병원 분석 관리').click()
+    expect(page.get_by_role('form',name='탭 접근 권한').locator('select[name="clinicId"]')).to_have_count(0)
     page.locator('select[name="userId"]').select_option(OUTSIDER)
-    page.locator('select[name="role"]').select_option('viewer')
+    page.locator('select[name="allowed"]').select_option('true')
     with page.expect_response(lambda r:r.url.endswith('/hospital-analytics/admin') and r.request.method=='POST') as saved:
         page.get_by_role('button',name='권한 저장',exact=True).click()
     assert saved.value.ok
     expect(page.locator('p[role="alert"]')).to_contain_text('저장했습니다')
     granted=authenticated(browser,OUTSIDER)
     assigned=granted.request.get(BASE+'/api/hospital-analytics/access').json()
-    assert [c['id'] for c in assigned['clinics']]==[FIRST]
-    page.locator('select[name="role"]').select_option('revoke')
+    assert assigned['canAccessTab'] and {c['id'] for c in assigned['clinics']}=={FIRST,SECOND,created_id}
+    granted_page=granted.new_page();granted_page.goto(BASE+'/hospital-analytics')
+    expect(granted_page.get_by_role('link',name='병원 분석',exact=True)).to_be_visible()
+    expect(granted_page.get_by_role('button',name='병원 분석 관리')).to_have_count(0)
+    assert granted.request.get(BASE+'/api/hospital-analytics/admin').status==403
+    assert granted.request.post(BASE+'/api/hospital-analytics/admin',headers={'Origin':BASE},data={'action':'set-tab-access','userId':VIEWER,'allowed':True}).status==403
+    # This clinic has no receipts yet; dashboard correctly asks for an upload.
+    # Its persisted workspace is readable immediately with the global tab grant.
+    assert granted.request.get(BASE+f'/api/hospital-analytics/runtime/{SECOND}/api/workspace').status==200
+    page.locator('select[name="allowed"]').select_option('false')
     with page.expect_response(lambda r:r.url.endswith('/hospital-analytics/admin') and r.request.method=='POST') as revoked:
         page.get_by_role('button',name='권한 저장',exact=True).click()
     assert revoked.value.ok
     expect(page.locator('p[role="alert"]')).to_contain_text('저장했습니다')
     assert granted.request.get(BASE+f'/api/hospital-analytics/runtime/{FIRST}/api/dashboard').status==403
-    granted.close();print('PASS admin assigns/revokes an existing ERP employee; cross-origin writes denied',flush=True)
+    assert granted.request.get(BASE+f'/api/hospital-analytics/runtime/{SECOND}/api/dashboard').status==403
+    granted_page.reload()
+    expect(granted_page.get_by_role('link',name='병원 분석',exact=True)).to_have_count(0)
+    expect(granted_page.get_by_role('heading',name='병원 분석 접근 권한이 없습니다.')).to_be_visible()
+    granted.close();print('PASS admin grants/revokes tab without clinic; selected employee sees all clinics but cannot manage access',flush=True)
     context.close()
-    # An assigned viewer can read, but cannot write or see the other clinic.
-    context=authenticated(browser,VIEWER);page=context.new_page();page.goto(BASE+'/hospital-analytics');expect(page.get_by_label('분석할 병원')).to_be_visible()
-    assert page.get_by_label('분석할 병원').locator('option').count()==2
+    # A historical per-clinic membership does not grant the tab anymore.
+    context=authenticated(browser,VIEWER);page=context.new_page();page.goto(BASE+'/hospital-analytics')
+    expect(page.get_by_role('heading',name='병원 분석 접근 권한이 없습니다.')).to_be_visible()
+    expect(page.get_by_role('link',name='병원 분석',exact=True)).to_have_count(0)
     assert context.request.get(BASE+f'/api/hospital-analytics/runtime/{SECOND}/api/dashboard').status==403
     assert context.request.post(BASE+'/api/hospital-analytics/upload-ticket',headers={'Origin':BASE},data={'clinicId':FIRST,'size':100}).status==403
-    context.close();print('PASS viewer read-only and clinic isolation',flush=True)
+    context.close();print('PASS unselected employee with legacy clinic membership has no tab or API access',flush=True)
     context=authenticated(browser,EDITOR)
     editor_page=context.new_page();editor_page.goto(BASE+'/hospital-analytics')
     editor_page.get_by_label('분석할 병원').select_option(FIRST)
@@ -125,7 +138,14 @@ with sync_playwright() as p:
     denied=context.request.post(ticket['url'],headers={'Authorization':'Bearer '+ticket['accessToken'],'apikey':ticket['publicKey'],'Content-Type':'application/octet-stream'},data=b'synthetic')
     assert denied.status==403
     assert context.request.get(BASE+f'/api/hospital-analytics/runtime/{FIRST}/api/dashboard').status==403
+    assert context.request.post('http://127.0.0.1:54840/api/analytics_runtime',headers={'Authorization':'Bearer '+ticket['accessToken']},data={'clinic':FIRST,'method':'GET','path':'/api/dashboard'}).status==403
     context.close();print('PASS membership revocation -> pending upload and reads denied',flush=True)
+    with urlopen(FIXTURE+'/__fixture/empty-clinics') as response:assert json.load(response)['ok']
+    context=authenticated(browser,EDITOR);page=context.new_page();page.goto(BASE+'/hospital-analytics')
+    expect(page.get_by_role('link',name='병원 분석',exact=True)).to_be_visible()
+    expect(page.get_by_text('등록된 병원이 없습니다. 관리자에게 등록을 요청해 주세요.')).to_be_visible()
+    assert context.request.get(BASE+'/api/hospital-analytics/access').json()['canAccessTab'] is True
+    context.close();print('PASS selected employee sees tab even with zero registered clinics',flush=True)
     context=browser.new_context()
     assert context.request.get(BASE+'/api/hospital-analytics/access').status==401
     assert context.request.get(BASE+f'/api/hospital-analytics/runtime/{FIRST}/index.html').status==401
