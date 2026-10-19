@@ -17,6 +17,22 @@ def aggregate_book(total=10,rank_count=7):
     out=io.BytesIO();book.save(out);return out.getvalue()
 
 class AddressSummaryTests(unittest.TestCase):
+    def test_apartment_locations_survive_report_rendering_without_guessing_missing_points(self):
+        import base64
+        from analytics_runtime.address_summary import map_data
+        report=self.parse()
+        location={'longitude':127.04,'latitude':37.5,'source_url':'https://example.org/address/1','source_name':'주소 기준','verified_at':'2026-10-20','precision':'address'}
+        report['rows'][0]['location']=location
+        data=json.loads(base64.b64decode(map_data(report)))
+        self.assertEqual(data['rows'][0]['location'],location)
+        self.assertEqual(data['rows'][0]['address'],report['rows'][0]['address'])
+        self.assertIsNone(data['rows'][1]['location'])
+    def test_invalid_apartment_location_fails_closed(self):
+        from analytics_runtime.address_summary import validate_report,SummaryError
+        good={'longitude':127.04,'latitude':37.5,'source_url':'https://example.org/address/1','source_name':'주소 기준','verified_at':'2026-10-20','precision':'address'}
+        for change in ({'latitude':float('nan')},{'longitude':181},{'latitude':True},{'source_url':'javascript:alert(1)'},{'precision':'invented'},{'source_url':'https://user:secret@example.org/'}):
+            report=self.parse();report['rows'][0]['location']={**good,**change}
+            with self.subTest(change=change),self.assertRaises(SummaryError):validate_report(report)
     def parse(self,**kwargs):
         from analytics_runtime.address_summary import parse_workbook
         return parse_workbook(aggregate_book(**kwargs),period='2026-09',source_name='aggregate.xlsx')

@@ -11,6 +11,7 @@ from datetime import datetime,timezone,timedelta
 from html import escape
 from itertools import islice
 from pathlib import Path
+from urllib.parse import urlsplit
 import openpyxl
 
 PERIOD=re.compile(r'20\d{2}-(?:0[1-9]|1[0-2])')
@@ -81,6 +82,17 @@ def validate_report(report,clinic_id=None):
         for key,limit in (('name',160),('address',300)):
             if not isinstance(row.get(key),str) or not 0<len(row[key])<=limit:raise SummaryError('집계 항목을 확인할 수 없습니다.')
         count(row.get('records'))
+        location=row.get('location')
+        if location is not None:
+            if not isinstance(location,dict):raise SummaryError('단지 위치 형식이 올바르지 않습니다.')
+            for key,limit in (('longitude',180),('latitude',85)):
+                value=location.get(key)
+                if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or abs(value)>limit:raise SummaryError('단지 좌표를 확인할 수 없습니다.')
+            for key,limit in (('source_url',2000),('source_name',100),('verified_at',50)):
+                if not isinstance(location.get(key),str) or not 0<len(location[key])<=limit:raise SummaryError('단지 위치의 출처가 없습니다.')
+            try:source=urlsplit(location['source_url'])
+            except ValueError:raise SummaryError('단지 위치 출처 주소가 올바르지 않습니다.') from None
+            if source.scheme!='https' or not source.hostname or source.username or source.password or location.get('precision')!='address':raise SummaryError('단지 위치 출처를 확인할 수 없습니다.')
     if len({r['name'] for r in rows})!=len(rows) or sum(r['records'] for r in rows)!=count(report.get('total_records')) or report['total_records']<=0:raise SummaryError('저장된 집계 합계가 올바르지 않습니다.')
     return report
 
@@ -113,7 +125,7 @@ def summary_script():
     return '(()=>{\n'+layout+'\n'+(WEB/'address-summary.js').read_text('utf8')+'\n})();'
 
 def map_data(report):
-    data={'features':report.get('geometry',[]),'rows':[{k:r.get(k) for k in ('name','records','region_code')} for r in report['rows']],
+    data={'features':report.get('geometry',[]),'rows':[{k:r.get(k) for k in ('name','address','records','region_code','region_name','location')} for r in report['rows']],
           'total':report['total_records'],'period':report['period']}
     return base64.b64encode(json.dumps(data,ensure_ascii=True,allow_nan=False).encode()).decode()
 
