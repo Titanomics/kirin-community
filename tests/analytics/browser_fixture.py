@@ -22,6 +22,7 @@ ADMIN='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';EDITOR='bbbbbbbb-bbbb-4bbb-8bbb-bbb
 profiles={uid:{'id':uid,'display_name':label,'email':label.lower()+'@example.test','role':role,'resigned_at':None,'team':None} for uid,label,role in ((ADMIN,'Admin','admin'),(EDITOR,'Editor','user'),(VIEWER,'Viewer','user'),(OUTSIDER,'Outsider','user'))}
 clinics=[{'id':cid,'name':name,'emr':'dentweb','owner':'','created_at':'2026-10-19T00:00:00Z'} for cid,name in ((FIRST,'검증 A 병원'),(SECOND,'검증 B 병원'))]
 members=[{'clinic_id':FIRST,'user_id':EDITOR,'role':'editor'},{'clinic_id':FIRST,'user_id':VIEWER,'role':'viewer'}]
+tab_members=[{'user_id':EDITOR}]
 states={cid:{'clinic_id':cid,'revision':0,'object_path':None,'sha256':None} for cid in (FIRST,SECOND)}
 objects={};lock=threading.Lock()
 
@@ -37,7 +38,7 @@ def identity(headers):
         return uid if uid in profiles else None
     except Exception:return None
 def can(uid,cid,write=False):
-    return uid in profiles and not profiles[uid]['resigned_at'] and (profiles[uid]['role']=='admin' or any(m['user_id']==uid and m['clinic_id']==cid and (not write or m['role']=='editor') for m in members))
+    return any(c['id']==cid for c in clinics) and uid in profiles and not profiles[uid]['resigned_at'] and (profiles[uid]['role']=='admin' or any(m['user_id']==uid for m in tab_members))
 
 class Fixture(BaseHTTPRequestHandler):
     def log_message(self,*args):pass
@@ -54,12 +55,18 @@ class Fixture(BaseHTTPRequestHandler):
         raw=self.rfile.read(int(self.headers.get('Content-Length','0')))
         if path=='/__fixture/reset':
             objects.clear()
-            for cid in states:states[cid]={'clinic_id':cid,'revision':0,'object_path':None,'sha256':None}
+            clinics[:]=[{'id':cid,'name':name,'emr':'dentweb','owner':'','created_at':'2026-10-19T00:00:00Z'} for cid,name in ((FIRST,'검증 A 병원'),(SECOND,'검증 B 병원'))]
+            states.clear()
+            states.update({cid:{'clinic_id':cid,'revision':0,'object_path':None,'sha256':None} for cid in (FIRST,SECOND)})
             members[:]=[{'clinic_id':FIRST,'user_id':EDITOR,'role':'editor'},{'clinic_id':FIRST,'user_id':VIEWER,'role':'viewer'}]
+            tab_members[:]=[{'user_id':EDITOR}]
+            return self.send(200,{'ok':True})
+        if path=='/__fixture/empty-clinics':
+            clinics.clear();states.clear();objects.clear();tab_members[:]=[{'user_id':EDITOR}]
             return self.send(200,{'ok':True})
         if path=='/__fixture/session':return self.send(200,session(q.get('user',[ADMIN])[0]))
         if path=='/__fixture/revoke':
-            members[:]=[m for m in members if m['user_id']!=EDITOR];return self.send(200,{'ok':True})
+            tab_members[:]=[m for m in tab_members if m['user_id']!=EDITOR];return self.send(200,{'ok':True})
         if not uid:return self.send(401,{'message':'Unauthorized'})
         if path=='/auth/v1/user':return self.send(200,user(uid))
         if path.startswith('/storage/v1/object/'):
@@ -86,14 +93,15 @@ class Fixture(BaseHTTPRequestHandler):
             if 'return=representation' in self.headers.get('Prefer',''):
                 return self.send(403,{'code':'42501','message':'new row violates row-level security policy for table ha_clinics'})
             clinic={**data,'id':data.get('id') or str(uuid.uuid4()),'created_at':'2026-10-19T00:00:00Z'};clinics.append(clinic);states[clinic['id']]={'clinic_id':clinic['id'],'revision':0,'object_path':None,'sha256':None};return self.send(201,b'')
-        if table=='ha_memberships' and self.command in ('POST','DELETE') and profiles[uid]['role']=='admin':
+        if table=='ha_tab_memberships' and self.command in ('POST','DELETE') and profiles[uid]['role']=='admin':
             if self.command=='POST':
-                members[:]=[m for m in members if not (m['clinic_id']==data['clinic_id'] and m['user_id']==data['user_id'])];members.append(data)
-            else:members[:]=[m for m in members if not all(str(m.get(k))==v[0][3:] for k,v in q.items() if v[0].startswith('eq.'))]
+                tab_members[:]=[m for m in tab_members if m['user_id']!=data['user_id']];tab_members.append(data)
+            else:tab_members[:]=[m for m in tab_members if not all(str(m.get(k))==v[0][3:] for k,v in q.items() if v[0].startswith('eq.'))]
             return self.send(200,[])
         if table=='profiles':rows=list(profiles.values()) if profiles[uid]['role']=='admin' else [profiles[uid]]
         elif table=='ha_clinics':rows=[c for c in clinics if can(uid,c['id'])]
         elif table=='ha_memberships':rows=members if profiles[uid]['role']=='admin' else [m for m in members if m['user_id']==uid]
+        elif table=='ha_tab_memberships':rows=tab_members if profiles[uid]['role']=='admin' else [m for m in tab_members if m['user_id']==uid]
         elif table=='ha_snapshots':rows=[s for cid,s in states.items() if can(uid,cid)]
         else:rows=[]
         for key,values in q.items():

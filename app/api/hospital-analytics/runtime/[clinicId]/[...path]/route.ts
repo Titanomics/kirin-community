@@ -12,7 +12,7 @@ async function proxy(request: NextRequest, context: Context) {
     const { clinicId, path } = await context.params;
     if (path.some(part => !part || part === '.' || part === '..' || /[\\%?#]/.test(part))) throw new AnalyticsError('지원하지 않는 경로입니다.', 400);
     const payload = request.method === 'POST' ? await body(request) : undefined;
-    const access = await readAccess(); requireClinic(access, clinicId, request.method === 'POST');
+    const access = await readAccess(); requireClinic(access, clinicId);
     const session = await access.client.auth.getSession();
     if (session.error || !session.data.session?.access_token) throw new AnalyticsError('ERP 로그인이 필요합니다.', 401);
     // Use trusted deployment configuration, never a caller-supplied Host or URL.

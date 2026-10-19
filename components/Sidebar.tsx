@@ -22,7 +22,7 @@ export default function Sidebar() {
     const controller = new AbortController();
     fetch('/api/hospital-analytics/access', { cache: 'no-store', signal: controller.signal })
       .then(async response => response.ok ? response.json() : null)
-      .then(access => { if (!controller.signal.aborted) setAnalyticsUser(access && (access.isAdmin || access.clinics?.length) ? userId : null); })
+      .then(access => { if (!controller.signal.aborted) setAnalyticsUser(access?.canAccessTab ? userId : null); })
       .catch(() => { if (!controller.signal.aborted) setAnalyticsUser(null); });
     return () => controller.abort();
   }, [userId, pathname]);

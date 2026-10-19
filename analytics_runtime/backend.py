@@ -57,10 +57,9 @@ class SupabaseBackend:
         profile=profiles[0]
         if profile['role']=='admin': role='admin'
         else:
-            memberships=self.request(f'/rest/v1/ha_memberships?clinic_id=eq.{clinic_id}&user_id=eq.{uid}&select=role')
-            if len(memberships)!=1 or memberships[0]['role'] not in ('editor','viewer'): raise CloudError('병원 접근 권한이 없습니다.',403)
-            role=memberships[0]['role']
-        if write and role=='viewer': raise CloudError('조회 권한으로는 변경할 수 없습니다.',403)
+            memberships=self.request(f'/rest/v1/ha_tab_memberships?user_id=eq.{uid}&select=user_id')
+            if len(memberships)!=1: raise CloudError('병원 분석 탭 접근 권한이 없습니다.',403)
+            role='editor'
         self.clinic=clinics[0]; self.role=role
         self.user={'id':uid,'username':uid,'name':profile.get('display_name') or 'ERP 사용자','role':role,'version':1,'clinic_ids':[clinic_id]}
         return self.user,self.clinic

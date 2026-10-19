@@ -3,7 +3,7 @@ import {configureScope,setClinicScope,setOperatorScope} from './scope.js';
 export function initAgency(){
   const clinicId=location.pathname.match(/^\/api\/hospital-analytics\/runtime\/([0-9a-f-]{36})\//)?.[1];
   const section=document.createElement('section');section.id='page-agency';section.className='page-view marketing-page';section.hidden=true;
-  const title=document.createElement('h2');title.textContent='병원과 담당자 관리';
+  const title=document.createElement('h2');title.textContent='병원 분석 관리';
   const link=document.createElement('a');link.href='/hospital-analytics';link.target='_top';link.className='button primary';link.textContent='ERP 병원 목록으로 돌아가기';
   section.append(title,link);document.querySelector('.main-footer').before(section);
   const status=document.createElement('span');status.className='access-state';document.querySelector('.top-right').prepend(status);
@@ -12,7 +12,8 @@ export function initAgency(){
     if(!response.ok)throw Error(access.error||'ERP 권한을 확인하지 못했습니다.');
     const clinic=access.clinics.find(c=>c.id===clinicId);if(!clinic)throw Error('이 병원에 대한 접근 권한이 없습니다.');
     setClinicScope(clinic.id);setOperatorScope(access.user);
-    const role=access.isAdmin?'admin':access.roles[clinic.id];document.body.dataset.access=role;
+    if(!access.canAccessTab)throw Error('병원 분석 탭 접근 권한이 없습니다.');
+    const role=access.isAdmin?'admin':'editor';document.body.dataset.access=role;
     document.title=clinic.name+' · 병원 분석';document.getElementById('active-clinic-name').textContent=clinic.name;
     document.querySelectorAll('[data-clinic-label]').forEach(el=>el.textContent=clinic.name);
     const box=document.querySelector('.clinic-switch');box.replaceChildren();
