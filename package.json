@@ -8,7 +8,8 @@
     "prebuild": "node scripts/analytics-version.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
