@@ -8,6 +8,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay,
 import { ko } from 'date-fns/locale';
 import CoreValueModal from './CoreValueModal';
 import { getTodayCoreValue, getTodayCoreValueIndex, isGracePeriod } from '@/lib/coreValues';
+import { isIpadDesktopMode } from '@/lib/attendance/policy';
 
 interface AttendanceRecord {
   id: string;
@@ -83,6 +84,7 @@ export default function AttendancePage() {
   const [now, setNow] = useState(new Date());
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [detectedIp, setDetectedIp] = useState<string | null>(null);
+  const [mobile, setMobile] = useState(false);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [monthRecords, setMonthRecords] = useState<AttendanceRecord[]>([]);
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
@@ -103,6 +105,7 @@ export default function AttendancePage() {
       const json = await res.json();
       setAllowed(json.allowed);
       setDetectedIp(json.ip || null);
+      setMobile(Boolean(json.mobile) || isIpadDesktopMode(navigator.userAgent, navigator.maxTouchPoints));
       setTodayRecord(json.record);
     } catch {}
 
@@ -124,33 +127,6 @@ export default function AttendancePage() {
     }
   }, [user, fetchData]);
 
-  // requestAnimationFrame 프레임 타이밍으로 원격 데스크톱 감지
-  function detectRemoteDesktop(): Promise<{ isRemote: boolean; stddev: number }> {
-    return new Promise((resolve) => {
-      const times: number[] = [];
-      let count = 0;
-      function measure(timestamp: number) {
-        times.push(timestamp);
-        count++;
-        if (count < 60) {
-          requestAnimationFrame(measure);
-        } else {
-          const deltas: number[] = [];
-          for (let i = 1; i < times.length; i++) {
-            deltas.push(times[i] - times[i - 1]);
-          }
-          const avg = deltas.reduce((a, b) => a + b, 0) / deltas.length;
-          const variance = deltas.reduce((a, b) => a + (b - avg) ** 2, 0) / deltas.length;
-          const stddev = Math.sqrt(variance);
-          // 일반 모니터: stddev < 3ms (안정적인 60fps)
-          // 원격 데스크톱: stddev > 5ms (불규칙한 프레임 스트리밍)
-          resolve({ isRemote: stddev > 5, stddev: Math.round(stddev * 100) / 100 });
-        }
-      }
-      requestAnimationFrame(measure);
-    });
-  }
-
   // 핵심가치 다짐(출근)/사례(퇴근)를 core_value_log에 저장. 비어있으면 저장 안 함(출퇴근은 그대로 진행).
   async function saveCoreValueText(field: 'intention' | 'reflection', text: string) {
     if (!user || !text) return;
@@ -164,18 +140,10 @@ export default function AttendancePage() {
   async function handleAction(action: 'check_in' | 'check_out') {
     setActionLoading(true);
     try {
-      // 원격 데스크톱 감지
-      const { isRemote, stddev } = await detectRemoteDesktop();
-      if (isRemote) {
-        alert('원격 데스크톱 환경에서는 출퇴근이 불가합니다. 사무실 PC에서 직접 접속해주세요.');
-        setActionLoading(false);
-        return;
-      }
-
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, frameStddev: stddev }),
+        body: JSON.stringify({ action }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -195,6 +163,7 @@ export default function AttendancePage() {
   const workMinutes = workInfo ? (todayRecord?.check_out ? workInfo.totalMinutes : Math.max(0, Math.floor((now.getTime() - new Date(todayRecord!.check_in!).getTime()) / 60000) - 60)) : 0;
   const workProgress = Math.min(100, Math.round((workMinutes / 480) * 100));
   const status = getStatusLabel(todayRecord, now);
+  const canAct = Boolean(allowed) && !mobile;
 
   // 달력 계산
   const calendarDays = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
@@ -345,15 +314,19 @@ export default function AttendancePage() {
         )}
 
         {/* 출퇴근 버튼 */}
-        {!allowed && (
+        {mobile ? (
+          <p className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700 text-center">
+            사무실 PC에서만 출퇴근이 가능합니다
+          </p>
+        ) : !allowed ? (
           <p className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700 text-center">
             회사 WiFi에서만 출퇴근이 가능합니다
           </p>
-        )}
+        ) : null}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setModalAction('check_in')}
-            disabled={!allowed || !!todayRecord?.check_in || actionLoading}
+            disabled={!canAct || !!todayRecord?.check_in || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-4 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_in ? (
@@ -364,7 +337,7 @@ export default function AttendancePage() {
           </button>
           <button
             onClick={() => setModalAction('check_out')}
-            disabled={!allowed || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
+            disabled={!canAct || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-gray-700 py-4 text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_out ? (
