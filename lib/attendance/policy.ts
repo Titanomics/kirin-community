@@ -31,8 +31,3 @@ export function resolveIpPolicy(ip: string, allowedEnv: string | undefined, verc
   const allowed = entries.some((entry) => (entry.endsWith('.') ? ip.startsWith(entry) : ip === entry));
   return { allowed, configured: true };
 }
-
-// iPadOS Safari "데스크톱 웹사이트 요청" 모드는 Mac UA를 보내지만 터치포인트가 있다. 클라이언트 UI 안내용.
-export function isIpadDesktopMode(userAgent: string, maxTouchPoints: number): boolean {
-  return /Macintosh/.test(userAgent) && maxTouchPoints > 1;
-}

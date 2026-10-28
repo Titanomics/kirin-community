@@ -47,10 +47,10 @@
 
 근거: Chromium 계열은 Accept-CH 없이도 저엔트로피 Client Hints(`Sec-CH-UA`, `Sec-CH-UA-Mobile`, `Sec-CH-UA-Platform`)를 HTTPS 요청에 기본 제공한다. 다만 생략될 수 있고 Safari·Firefox는 보내지 않으므로 UA로 폴백한다. 헤더 부재는 PC라는 증거가 아니다. 이 판정은 소프트 가드다.
 
-- GET 응답에 `mobile: boolean` 필드를 추가한다. 기존 `allowed`, `ip`, `record`는 유지.
-- POST에서 모바일이면 IP 검사 직후 다음으로 거부한다.
+- GET 응답은 변경하지 않는다 (`allowed`, `ip`, `record`). 모바일 여부를 클라이언트에 노출하지 않는다.
+- POST에서 모바일이면 IP 검사 직후 이유 없는 일반 403으로 거부한다. 직원에게 변화를 드러내지 않기 위한 결정 (2026-10-28 사용자 요청).
   ```json
-  { "error": "모바일에서는 출퇴근이 불가합니다. 사무실 PC에서 진행해주세요." }  // 403
+  { "error": "403 Forbidden" }  // 403
   ```
 
 **(c) 쓰기를 service_role 클라이언트로 전환**
@@ -94,12 +94,7 @@ drop policy if exists "Users can update own attendance" on public.attendance;
 ### 4.3 클라이언트: `app/(main)/attendance/page.tsx`
 
 - `detectRemoteDesktop` 함수와 `handleAction` 내 호출, `frameStddev` 전송을 삭제한다.
-- 상태 `mobile: boolean` 추가. `fetchData`에서 GET 응답의 `json.mobile`을 저장한다.
-- 클라이언트 보완 판정: `navigator.userAgent`에 `Macintosh`가 있고 `navigator.maxTouchPoints > 1`이면 iPad 데스크톱 모드로 보고 `mobile = true`. 서버는 이 경우를 못 잡으므로 UI 안내 목적이다.
-- `mobile`이 true면:
-  - 출근/퇴근 버튼 `disabled`
-  - 기존 "회사 WiFi에서만 출퇴근이 가능합니다" 안내 자리에 "사무실 PC에서만 출퇴근이 가능합니다" 문구를 우선 표시
-- 헤더의 네트워크 배지(사내 네트워크 ✓ / 외부 네트워크 ✕)는 그대로 둔다.
+- 그 외 UI는 바꾸지 않는다. 모바일에서도 버튼·안내·모달이 이전과 똑같이 보이고, 출근/퇴근을 누르면 기존 오류 alert 경로로 "403 Forbidden"이 뜰 뿐이다. 직원이 변화를 알아채지 않게 하려는 요구사항이다.
 
 ### 4.4 환경변수 정리
 
@@ -125,7 +120,7 @@ UA 판정은 폰 데스크톱 모드로 우회된다. 아래 운영 조치가 �
 
 | 경로 | 결과 |
 |---|---|
-| 폰 브라우저(일반 모드)로 출석 | 서버 403 + UI 비활성 |
+| 폰 브라우저(일반 모드)로 출석 | 서버 403 (이유 미표시). UI는 변화 없음 |
 | 폰 데스크톱 모드 + 사내 WiFi | UA로는 못 막음. 5절 네트워크 분리로 WiFi 자체를 못 잡게 함 |
 | 폰 데스크톱 모드 + LTE | IP 허용목록이 막음 |
 | 개발자 도구에서 Supabase 직접 INSERT/UPDATE | RLS 거부 |
@@ -137,8 +132,8 @@ UA 판정은 폰 데스크톱 모드로 우회된다. 아래 운영 조치가 �
 테스트 프레임워크가 없으므로 `npm run build` 통과 + 수동 확인.
 
 1. PC 크롬, 사무실 네트워크: GET `mobile: false`, 출근/퇴근 정상.
-2. 폰 크롬(Android), 폰 사파리(iOS): GET `mobile: true`, 버튼 비활성, 강제 POST 시 403.
-3. 아이패드 사파리 데스크톱 모드: UI 비활성 (서버는 통과할 수 있음, 알려진 한계).
+2. 폰 크롬(Android), 폰 사파리(iOS): 화면은 이전과 동일, 출근 클릭 시 "403 Forbidden" alert.
+3. 아이패드 사파리 데스크톱 모드: 서버가 통과시킬 수 있음 (알려진 한계, 네트워크 분리로 보완).
 4. 직원 계정으로 브라우저 콘솔에서 `supabase.from('attendance').insert(...)`: RLS 에러. `update(...)`는 오류 없이 0행으로 끝날 수 있으므로 **실제 값이 안 바뀌었는지** 재조회로 확인.
 5. 관리자 페이지: 신규 행 upsert, 기존 행 수정, 삭제 모두 기존대로 동작.
 6. `SUPABASE_SERVICE_ROLE_KEY` 제거 후 POST: 500 명확 실패.

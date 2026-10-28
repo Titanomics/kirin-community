@@ -8,7 +8,6 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay,
 import { ko } from 'date-fns/locale';
 import CoreValueModal from './CoreValueModal';
 import { getTodayCoreValue, getTodayCoreValueIndex, isGracePeriod } from '@/lib/coreValues';
-import { isIpadDesktopMode } from '@/lib/attendance/policy';
 
 interface AttendanceRecord {
   id: string;
@@ -84,7 +83,6 @@ export default function AttendancePage() {
   const [now, setNow] = useState(new Date());
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [detectedIp, setDetectedIp] = useState<string | null>(null);
-  const [mobile, setMobile] = useState(false);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [monthRecords, setMonthRecords] = useState<AttendanceRecord[]>([]);
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
@@ -105,7 +103,6 @@ export default function AttendancePage() {
       const json = await res.json();
       setAllowed(json.allowed);
       setDetectedIp(json.ip || null);
-      setMobile(Boolean(json.mobile) || isIpadDesktopMode(navigator.userAgent, navigator.maxTouchPoints));
       setTodayRecord(json.record);
     } catch {}
 
@@ -163,7 +160,6 @@ export default function AttendancePage() {
   const workMinutes = workInfo ? (todayRecord?.check_out ? workInfo.totalMinutes : Math.max(0, Math.floor((now.getTime() - new Date(todayRecord!.check_in!).getTime()) / 60000) - 60)) : 0;
   const workProgress = Math.min(100, Math.round((workMinutes / 480) * 100));
   const status = getStatusLabel(todayRecord, now);
-  const canAct = Boolean(allowed) && !mobile;
 
   // 달력 계산
   const calendarDays = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
@@ -314,19 +310,15 @@ export default function AttendancePage() {
         )}
 
         {/* 출퇴근 버튼 */}
-        {mobile ? (
-          <p className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700 text-center">
-            사무실 PC에서만 출퇴근이 가능합니다
-          </p>
-        ) : !allowed ? (
+        {!allowed && (
           <p className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700 text-center">
             회사 WiFi에서만 출퇴근이 가능합니다
           </p>
-        ) : null}
+        )}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setModalAction('check_in')}
-            disabled={!canAct || !!todayRecord?.check_in || actionLoading}
+            disabled={!allowed || !!todayRecord?.check_in || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-4 text-base font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_in ? (
@@ -337,7 +329,7 @@ export default function AttendancePage() {
           </button>
           <button
             onClick={() => setModalAction('check_out')}
-            disabled={!canAct || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
+            disabled={!allowed || !todayRecord?.check_in || !!todayRecord?.check_out || actionLoading}
             className="flex items-center justify-center gap-2 rounded-xl bg-gray-700 py-4 text-base font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40 transition-all"
           >
             {todayRecord?.check_out ? (

@@ -53,13 +53,13 @@ function kstToday(now: Date = new Date()): string {
   return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }); // YYYY-MM-DD
 }
 
-// GET: 현재 IP 허용 여부 + 모바일 여부 + 오늘 출퇴근 상태 조회
+// GET: 현재 IP 허용 여부 + 오늘 출퇴근 상태 조회
 export async function GET(request: NextRequest) {
-  const { ip, ipPolicy, mobile } = evaluateRequest(request);
+  const { ip, ipPolicy } = evaluateRequest(request);
   const supabase = await createUserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ allowed: ipPolicy.allowed, mobile, ip, record: null });
+    return NextResponse.json({ allowed: ipPolicy.allowed, ip, record: null });
   }
 
   const { data: record } = await supabase
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     .eq('date', kstToday())
     .maybeSingle();
 
-  return NextResponse.json({ allowed: ipPolicy.allowed, mobile, ip, record: record ?? null });
+  return NextResponse.json({ allowed: ipPolicy.allowed, ip, record: record ?? null });
 }
 
 // POST: 출근 / 퇴근 처리
@@ -85,11 +85,9 @@ export async function POST(request: NextRequest) {
       { status: 403 }
     );
   }
+  // 모바일은 이유를 알리지 않고 일반 403으로만 거부한다 (직원에게 변화를 드러내지 않음).
   if (mobile) {
-    return NextResponse.json(
-      { error: '모바일에서는 출퇴근이 불가합니다. 사무실 PC에서 진행해주세요.' },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: '403 Forbidden' }, { status: 403 });
   }
 
   const supabase = await createUserClient();
