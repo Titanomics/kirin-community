@@ -69,9 +69,9 @@
 - 현재 POST는 `.single()` 결과의 `error`를 무시하고 `existing`이 null이면 "기록 없음"으로 본다. 0행이 아니라 실제 조회 오류(네트워크, RLS 변경 등)여도 같은 분기로 가서, service_role `upsert`가 **기존 출근 시각을 덮어쓸 수 있다**.
 - 변경: `.maybeSingle()`로 0행을 정상 처리하고, `error`가 있으면 쓰기 없이 500으로 중단한다.
 
-### 4.2 DB: 마이그레이션 `../supabase/migrations/20261028000000_attendance_drop_user_write_policies.sql`
+### 4.2 DB: 마이그레이션 `supabase/migrations/20261028000000_attendance_drop_user_write_policies.sql`
 
-기존 마이그레이션 2개와 같은 위치(앱 폴더의 상위 `supabase/migrations/`, 별도 git 저장소)에 둔다. 적용은 Supabase MCP `apply_migration` 또는 대시보드 SQL 편집기로 한다.
+앱 저장소 안의 `supabase/migrations/`(병원 분석 기능이 쓰기 시작한 위치)에 둔다. 적용은 Supabase MCP `apply_migration` 또는 대시보드 SQL 편집기로 한다.
 
 ```sql
 drop policy if exists "Users can insert own attendance" on public.attendance;
